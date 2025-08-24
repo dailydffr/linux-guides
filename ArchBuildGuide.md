@@ -1,3 +1,26 @@
+## Table of Contents
+
+- [About This Guide](#about-this-guide)
+  - [Important Note](#important-note)
+- [SECTION 1: SYSTEM CHECKS](#section-1-system-checks)
+  - [Task 1 - Verify boot mode](#task-1---verify-boot-mode)
+  - [Task 2 - Identify available storage devices](#task-2-identify-available-storage-devices)
+  - [Task 3 - Detect network interfaces](#task-3-detect-network-interfaces)
+  - [Task 4 - Check the TPM](#task-4-check-the-tpm)
+- [SECTION 2: WIFI & NETWORKING](#section-2-wifi--networking)
+  - [Task 1 - WiFi](#task-1-wifi)
+  - [Task 2 - DHCP/Manual IP](#task-2-dhcpmanual-ip)
+  - [Task 3 - Check Internet Connection](#task-3-check-internet-connection)
+  - [Task 4 - Enable SSH access](#task-4-enable-ssh-access)
+- [SECTION 3: PARTITIONS](#section-3-partitions)
+  - [Task 1 - Build the Partition Table](#task-1-build-the-partition-table)
+  - [Task 2 - Encrypt All the things!](#task-2-encrypt-all-the-things)
+  - [Task 3 - Swap Calculation](#task-3-swap-calculation)
+  - [Task 4 - Setup LVMs](#task-4-setup-lvms)
+  - [Task 5 - Format Partitions](#task-5-format-partitions)
+  - [Task 6 - Setup btrfs on root](#task-6-setup-btrfs-on-root)
+  - [Task 7 - Prepare the build space](#task-7-prepare-the-build-space)
+
 # About This Guide
 
 This document began as a personal reference for installing and configuring Arch Linux the way *I* prefer it—lean, secure, and optimized for modern hardware. I’ve chosen to publish it publicly in case others find it useful.
@@ -19,7 +42,7 @@ While these instructions can be adapted to many types of hardware, the guide is 
 
 Performance and reliability are also priorities. The guide assumes modern storage such as NVMe or SSD drives, and the configuration choices reflect best practices for SSD health and speed. If you are attempting this installation on legacy hardware—say, a 15+ year-old desktop with mechanical IDE drives—the steps may still work, but there are likely other guides better suited to that scenario.
 
-⚠⚠️ This guide assumes a single-boot system. Dual-booting with Windows or any other OS is not supported here. If that’s your goal, good luck… and keep a stress ball handy.
+⚠️ This guide assumes a single-boot system. Dual-booting with Windows or any other OS is not supported here. If that’s your goal, good luck… and keep a stress ball handy.
 
 In short:
 
@@ -34,10 +57,10 @@ Switch to root with `su` or restart the ISO and pick the correct boot option.
 
 
 
-## ⚠️ Important Note ⚠️
-This setup uses full disk encryption with Clevis. The boot partition will be encrypted, and we will not integrate a keyfile into the initramfs. If you are using UEFI without TPM, the guide can still be followed. However:
-  - You will be prompted twice for your root partition password during boot.
-  - This can be an acceptable compromise, but think carefully before continuing.
+> ## ⚠️ Important Note ⚠️
+> This setup uses full disk encryption with Clevis. The boot partition will be encrypted, and we will not integrate a keyfile into the initramfs. If you are using UEFI without TPM, the guide can still be followed, however:
+>  - You will be prompted twice for your root partition password during boot.
+>  - This can be an acceptable compromise, but think carefully before continuing.
 
 Now that we have a general understanding of what we're working with, let's move on to the initial setup.
 
@@ -45,19 +68,13 @@ Now that we have a general understanding of what we're working with, let's move 
 
 # SECTION 1: SYSTEM CHECKS
 
-### Step 1: Verify the boot mode
+> ### **Task 1 - Verify boot mode**
 
 Check whether the system is booted in **UEFI mode** (required for this guide):
-
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 ls -l /sys/firmware/efi/efivars
 ```
 Expected output (truncated):
-
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 total 0
 -rw-r--r-- 1 root root   66 Aug 22 13:05 Boot0000-8be...
@@ -71,17 +88,13 @@ These files are UEFI variables.
 If the directory is empty, or does not exist, stop here and reboot the installer in **UEFI mode**.
 
 
-### Step 2: Identify available storage devices ════╗
+> ### **Task 2: Identify available storage devices**
 We need to confirm what disk(s) are present before partitioning:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 lsblk
 ```
 
 Example output:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 NAME  MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
 loop0   7:0    0 959.8M  1 loop /run/archiso/airootfs
@@ -95,18 +108,14 @@ Notes:
 • This guide will use `/dev/sda`. **replace with your actual device!**  
 • Copy/paste blindly at your own peril.
 
-### Step 3: Detect network interfaces ═══════╗
+> ### **Task 3: Detect network interfaces**
 
 Let’s check which devices exist, and whether one is already online:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 ip a
 ```
 
 Example output:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc ... qlen 1000
     inet 127.0.0.1/8 scope host lo
@@ -122,8 +131,6 @@ Interpretation:
 Take note of your actual device names!
 
 If you see something like this:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 2: ens18: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc ... qlen 1000
     inet 192.168.0.149/24 brd 192.168.0.255 ...
@@ -132,32 +139,25 @@ Your Ethernet device is already connected.
 Congratulations! You should already have internet access.
 
 If you see interfaces such as:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 4: br-bd78161b2e72: <NO-CARRIER,BROADCAST,MULTICAST,UP> ...
 5: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> ...
 ```
-⚠️ You are not running from the Arch ISO environment. ⚠️
-- Likely you booted into another OS. Stop here and re-examine your setup!
+> ⚠️ You are not running from the Arch ISO environment. ⚠️ Likely you booted into another OS. Stop here and re-examine your setup!
 
 
 
-### Step 4: Check the TPM 
+> ### **Task 4: Check the TPM**
 Let’s confirm you have a working **Trusted Platform Module (TPM):**
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 ls /dev/tpm*
 ```
 If your system has a TPM, you should see output similar to:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 crw-rw---- 1 tss  root  10,   224 Aug 22 13:05 /dev/tpm0
 crw-rw---- 1 root tss  253, 65536 Aug 22 13:05 /dev/tpmrm0
 ```
-⚠️ If you do not see these devices, it is *not* recommended to proceed. ⚠️
+> ⚠️ If you do not see these devices, it is *not* recommended to proceed. ⚠️
 
 
 
@@ -165,33 +165,50 @@ crw-rw---- 1 root tss  253, 65536 Aug 22 13:05 /dev/tpmrm0
 
 NOTE: If your system already has an active Ethernet connection (discovered in "SYSTEM CHECKS" → "Detect network interfaces"), you can skip the WiFi and DHCP/Manual IP tasks.
 
-### Step 1: WiFi
+> ### **Task 1: WiFi**
 If you do not have an active Ethernet link, use iwd to configure WiFi:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 iwctl
-[iwd] station list
+station list
 ```
-Identify your WiFi adapter (typically "wlan0"):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
+You will see something like this:
+```text
+                            Devices in Station Mode                           *
+--------------------------------------------------------------------------------
+  Name                  State            Scanning
+--------------------------------------------------------------------------------
+  wlan0                 disconnected     scanning  
+```
+Your WiFi adapter is typically `wlan0`
 
+Next, scan for access points:
 ```bash
-[iwd] station wlan0 scan
-[iwd] station wlan0 get-networks
+station wlan0 scan
+station wlan0 get-networks
 ```
-Connect to your network:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
+You will get back a list, like this:
+```text
+                               Available networks                              
+--------------------------------------------------------------------------------
+      Network name                      Security            Signal
+--------------------------------------------------------------------------------
+      It-Burns-When-IP                  psk                 ****    
+      ATTjBKEIbz                        psk                 ****    
+      this_one_Tod                      psk                 ****    
+      BlueNose                          psk                 ****    
+      OldPeople12345                    psk                 ****    
+      2deep                             psk                 ****    
+```
+One of those should be your router/ap. Otherwise, it's outside the scope of this guide.
 
+Connect to *your* network:
 ```bash
-[iwd] station wlan0 connect YOUR-NETWORK-SSID
-[iwd] exit
+station wlan0 connect YOUR-NETWORK-SSID
+exit
 ```
 
-### Step 2: DHCP/Manual IP
+> ### **Task 2: DHCP/Manual IP**
 Most networks use DHCP, which Arch ISO's NetworkManager handles automatically. If your network does not provide DHCP, manually assign an IP address:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 ip addr add 192.168.1.50/24 dev ens18
 ip link set ens18 up
@@ -202,43 +219,31 @@ Assumptions:
 - Default gateway at `192.168.1.1` (adjust for your network).  
 - Replace values with your network's configuration.
 
-### Step 3: Check Internet Connection
+> ### **Task 3: Check Internet Connection**
 Whether via Ethernet or WiFi, confirm Internet connectivity:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 ping -c 3 www.archlinux.org
 ```
 Alternative if `archlinux.org` is unreachable:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 ping -c 3 8.8.8.8
 ```
 Successful replies indicate you have a working Internet connection.
 
-### Step 4: Enable SSH access
+> ### **Task 4: Enable SSH access**
 Set a root password:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 passwd
 ```
 Start the sshd daemon:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 systemctl start sshd
 ```
 Confirm the installer's IP address:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 ip a
 ```
 SSH into the live installer from another PC:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 ssh root@<installer-IP-address>
 ```
@@ -253,10 +258,8 @@ Why enable SSH? Copy/pasting commands from this guide remotely is much easier th
 NOTE: The astute will notice some strangeness in my partitioning... There is method to my madness.
 We will be building a recovery partition, standing right next to the EFI partition. This recovery partition is not just for emergencies — it’s a second, bootable Arch installation. However, for the sake of security it too will get the full encryption treatment.
 
-### Step 1: Build the Partition Table ═╗
+> ### **Task 1: Build the Partition Table**
 Launch the partitioning tool:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 cfdisk /dev/sda
 ```
@@ -278,14 +281,10 @@ NOTE: the second partition is the future recovery drive. I set it to 12GB. you c
 - Anything larger is just comfort room.
 
 Sanity check.
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 lsblk
 ```
 Your drives should now look something like this:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
 loop0    7:0    0 959.8M  1 loop /run/archiso/airootfs
@@ -296,15 +295,13 @@ sda      8:0    0   256G  0 disk
 sr0     11:0    1   1.3G  0 rom  /run/archiso/bootmnt
 ```
 
-### Step 2: Encrypt All the things!
+> ### **Task 2: Encrypt All the things!**
 Encrypt the non-EFI partitions:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
-cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda2`
-cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda3`
+cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda2
+cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda3
 ```
-NOTE: All options in the commands above are chosen to ensure compatibility with GRUB, SSDs, and strong encryption. Note: GRUB does not support LUKS2 yet, hence `--type luks1`, and it's very picky about iter-time and sector-size. Unless you know what your doing, just leave the command as-is.
+NOTE: All options in the commands above are chosen to ensure compatibility with GRUB, SSDs, and strong encryption. Note: GRUB does not support LUKS2 yet, hence `--type luks1`, and it's very picky about iter-time and sector-size. Unless you know what you’re doing, just leave the command as-is.
 
 Follow the prompts, but as a security note, this guide expects you to use a **STRONG** password. A weak password will negate any efforts we go through to secure your computer.
 
@@ -313,21 +310,15 @@ What qualifies as a strong password?
 - If you'd like help picking a strong password: [xkpasswd.net](https://www.xkpasswd.net/)
   
 Now, Open the newly encrypted partitions:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 cryptsetup luksOpen /dev/sda2 cryptrec
 cryptsetup luksOpen /dev/sda3 cryptsys
 ```
 And once again, let's check your work!
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 lsblk
 ``
 Your drives should now look something like this:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 NAME         MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
 loop0          7:0    0 959.8M  1 loop  /run/archiso/airootfs
@@ -340,13 +331,11 @@ sda            8:0    0   256G  0 disk
 sr0           11:0    1   1.3G  0 rom   /run/archiso/bootmnt
 ```
 
-# Step 3: Swap Calculation
+> ### **Task 3: Swap Calculation**
 How much swap do you need?
 The old rule of thumb was 2.5× your RAM—back when 4 GB was considered “friken' *HUGE*.” Nowadays, 64 GB of RAM isn’t entirely unreasonable. As of this writing, most systems only need a couple of gigabytes of swap—unless you want **hibernation/resume**. In that case, you need roughly the same amount of swap space as your total RAM size, plus a little overhead.
 
 Let’s calculate it with a simple one-liner:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 awk '/MemTotal/ {ram=$2/1024; swap=(ram<2048?ram*2:(ram>65536?65536:ram+4096)); printf "%.0f\n", swap}' /proc/meminfo
 ```
@@ -360,48 +349,34 @@ The logic behind this number:
 If you have 64 GB or more of RAM… congratulations! You probably don’t even need swap for general use! However, If you **want** more swap with 64GB+ of RAM… ***why?***
 
 
-### Step 4: Setup LVMs
+> ### **Task 4: Setup LVMs**
 We’re now going to carve up cryptsys into logical volumes for root and swap.
 
 Initialize the encrypted volume for LVM:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 pvcreate /dev/mapper/cryptsys
 ```
 Create a volume group named 'lvm' on the encrypted volume:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 vgcreate lvm /dev/mapper/cryptsys
 ```
 Create a root logical volume of 1 GB (we'll resize later if needed):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 lvcreate -L 1G lvm -n root
 ```
 Create a swap logical volume using the number you noted from the "Swap Calculation" step (Replace `<SWAP_SIZE>`):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 lvcreate -L <SWAP_SIZE>M lvm -n swap
 ```
 Replace `<SWAP_SIZE>` with the number output from the swap calculation command. Yes, copy/paste that number here.
 
 Extend the root volume to use all remaining free space:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 lvextend -l 100%FREE /dev/mapper/lvm-root
 ```
 Sanity check:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 lsblk
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 NAME           MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
 loop0            7:0    0 959.8M  1 loop  /run/archiso/airootfs
@@ -416,42 +391,30 @@ sda              8:0    0   256G  0 disk
 sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt
 ```
 
-### Step 5: Format Partitions
+> ### **Task 5: Format Partitions**
 Format EFI (Fat32):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mkfs.fat -F32 /dev/sda1
 ```
 Format recovery (ext4):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mkfs.ext4 -L recovery /dev/mapper/cryptrec
 ```
 Format lvm-root (Btrfs):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mkfs.btrfs -L root /dev/mapper/lvm-root
 ```
 Format lvm-swap (swap):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mkswap /dev/mapper/lvm-swap
 ```
 
-### Step 6: Setup btrfs on root
+> ### **Task 6: Setup btrfs on root**
 Temporarily mount lvm-root to create subvols:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mount /dev/mapper/lvm-root /mnt
 ```
 Create the subvolumes:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 btrfs subvolume create /mnt/@
 btrfs subvolume create /mnt/@home
@@ -461,14 +424,10 @@ btrfs subvolume create /mnt/@varlibpacman
 btrfs subvolume create /mnt/@vartmp
 ```
 Sanity check:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 btrfs subvolume list /mnt
 ```
 You should see something like this:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 ID 256 gen 9 top level 5 path @
 ID 257 gen 10 top level 5 path @home
@@ -478,81 +437,57 @@ ID 260 gen 11 top level 5 path @varlibpacman
 ID 261 gen 11 top level 5 path @vartmp
 ```
 Unmount `/dev/mapper/lvm-root`:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 umount /mnt
 ```
-⚠️ THIS IS NECESSARY! Do not skip! ⚠️
+> ⚠️ THIS IS NECESSARY! Do not skip! ⚠️
 
-### Step 7: Prepare the build space
+> ### **Task 7: Prepare the build space**
 Mount @ (compressed):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mount -o ssd,noatime,compress=zstd:3,space_cache=v2,discard=async,subvol=@ /dev/mapper/lvm-root /mnt
 ```
 Create mount points:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mkdir -p /mnt/{boot/efi,home,var/log,var/cache,var/lib/pacman,var/tmp,recovery}
 ```
 Mount efi (secure, minimal writes):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mount -o umask=0077 /dev/sda1 /mnt/boot/efi
 ```
 Mount @home (compressed):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mount -o ssd,noatime,compress=zstd:3,space_cache=v2,discard=async,subvol=@home /dev/mapper/lvm-root /mnt/home
 ```
 Mount @varlog (no compression; keep CoW/checksums):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mount -o ssd,noatime,nocompress,space_cache=v2,discard=async,subvol=@varlog /dev/mapper/lvm-root /mnt/var/log
 ```
 Mount @varcache/@vartmp/@varlibpacman (no CoW, no compression):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mount -o ssd,noatime,nodatacow,nocompress,space_cache=v2,discard=async,subvol=@varcache /dev/mapper/lvm-root /mnt/var/cache
 mount -o ssd,noatime,nodatacow,nocompress,space_cache=v2,discard=async,subvol=@vartmp /dev/mapper/lvm-root /mnt/var/tmp
 mount -o ssd,noatime,nodatacow,nocompress,space_cache=v2,discard=async,subvol=@varlibpacman /dev/mapper/lvm-root /mnt/var/lib/pacman
 ```
 Make NOCOW persistent for new files in these subvolumes (Optional):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 chattr +C /mnt/var/cache
 chattr +C /mnt/var/tmp
 chattr -R +C /mnt/var/lib/pacman
 ```
 Mount recovery (quiet, fewer writes; safe journaling):
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 mount -o noatime,discard=async,data=ordered,commit=120 /dev/mapper/cryptrec /mnt/recovery
 ```
 Enable swap
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 swapon /dev/mapper/lvm-swap
 ```
 Sanity check:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">bash</div>
-
 ```bash
 lsblk
 ```
 Your partition layout should look like this:
-<div style="font-size: 0.8em; display:inline-block; padding:2px 6px; border-radius:4px; margin-bottom:2px;">text</div>
-
 ```text
 NAME           MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
 loop0            7:0    0 959.8M  1 loop  /run/archiso/airootfs
