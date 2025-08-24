@@ -1,6 +1,6 @@
-════════════════════════════════════════════════════════════════════════
-                                                       About This Guide
-════════════════════════════════════════════════════════════════════════
+═══════════════════════════════════════════════
+                               About This Guide
+═══════════════════════════════════════════════
 
 Arch Build Guide - 2025.08.01-x86_64 - v3
 
@@ -1385,4 +1385,5 @@ $ sudo reboot
 
 
 That's it! There's a whole lot more to do for me and most normal Arch users, but if you still need a guide (or if you needed one to begin with past the function of "crib notes"), Arch may not be the right distribution for you.
+
 
