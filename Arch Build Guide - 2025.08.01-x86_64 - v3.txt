@@ -1,0 +1,1385 @@
+════════════════════════════════════════════════════════════════════════
+                                                       About This Guide
+════════════════════════════════════════════════════════════════════════
+
+This document began as a personal reference for installing and configuring Arch Linux the way *I* prefer it—lean, secure, and optimized for modern hardware. I’ve chosen to publish it publicly in case others find it useful.
+
+That said, this is not a beginner’s Linux tutorial. The guide assumes you already have some familiarity with Linux and the command line. Specifically, it expects that you:
+
+- Know how to download the official Arch Linux installation image.  
+- Can create a bootable USB/DVD from that image.  
+- Understand how to boot your system from that media.  
+- Have a working network infrastructure ready (e.g., Ethernet cable connected, or a wireless access point available).  
+
+I will provide guidance for connecting to the network during installation, but the underlying setup of your home or office network is outside the scope of this guide.
+
+While these instructions can be adapted to many types of hardware, the guide is written with laptops in mind. Laptops are portable, and with portability comes a higher need for security. For that reason, particular attention is given to features such as:
+
+- UEFI boot environments.  
+- TPM-based security integrations.  
+- Full-disk encryption and data protection against theft.  
+
+Performance and reliability are also priorities. The guide assumes modern storage such as NVMe or SSD drives, and the configuration choices reflect best practices for SSD health and speed. If you are attempting this installation on legacy hardware—say, a 15+ year-old desktop with mechanical IDE drives—the steps may still work, but there are likely other guides better suited to that scenario.
+
+⚠⚠️ This guide assumes a single-boot system. Dual-booting with Windows or any other OS is not supported here. If that’s your goal, good luck… and keep a stress ball handy.
+
+In short:
+
+- This is a **technical, security-focused, laptop-oriented Arch Linux installation guide**.  
+- It prioritizes modern hardware and best practices.  
+- It is written for my own use first—but if it helps you, welcome aboard.
+
+Note: All commands in this guide are run as `root` (shown with `#`).  
+You’re in the Arch ISO environment — if you see a `$` prompt, something is wrong.  
+Switch to root with `su` or restart the ISO and pick the correct boot option.
+
+
+
+════════════════════════════════════════════════════════════════════════
+                                               SECTION 1: SYSTEM CHECKS
+════════════════════════════════════════════════════════════════════════
+
+╔═════════════════════════════════════════ Task: Verify the boot mode ═╗
+Check whether the system is booted in **UEFI mode** (required for this guide):
+
+`# ls -l /sys/firmware/efi/efivars`
+
+Expected output (truncated example):
+
+`total 0
+-rw-r--r-- 1 root root   66 Aug 22 13:05 Boot0000-8be4df61-93ca-11d2-aa0d-00e098032b8c
+-rw-r--r-- 1 root root  112 Aug 22 13:05 Boot0002-8be4df61-93ca-11d2-aa0d-00e098032b8c
+-rw-r--r-- 1 root root   24 Aug 22 13:05 LoaderFirmwareType-4a67b082-0a4c-41cf-b6c7-440b29bb8c4f
+-rw-r--r-- 1 root root    5 Aug 22 13:05 SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c
+...`
+
+These files are UEFI variables.  
+If the directory is empty, or does not exist, you are in **BIOS/Legacy** mode.  
+→ Stop here and reboot the installer in **UEFI mode**.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════ Task: Identify available storage devices ════╗
+We need to confirm what disk(s) are present before partitioning:
+
+`# lsblk`
+
+Example output:
+
+`NAME  MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+loop0   7:0    0 959.8M  1 loop /run/archiso/airootfs
+sda     8:0    0   256G  0 disk 
+sr0    11:0    1   1.3G  0 rom  /run/archiso/bootmnt`
+
+Notes:  
+• In this example the target disk is `/dev/sda` and it is a 256GB SSD.
+• NVMe drives use a different naming scheme (e.g., `/dev/nvme0n1`).  
+• All examples in this guide will use `/dev/sda` — **replace with your actual device!**  
+• Copy/paste blindly at your own peril.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════ Task: Detect network interfaces ═══════╗
+Let’s check which devices exist, and whether one is already online:
+
+`# ip a`
+
+Example output:
+
+`1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    inet 127.0.0.1/8 scope host lo
+       valid_lft forever preferred_lft forever
+2: ens18: <BROADCAST,MULTICAST> mtu 1500 qdisc fq_codel state DOWN group default qlen 1000
+    link/ether a7-dc-2c-ce-e2-fe brd ff:ff:ff:ff:ff:ff
+3: wlan0: <BROADCAST,MULTICAST> mtu 1500 qdisc noqueue state DOWN group default qlen 1000
+    link/ether 22-f5-7b-d6-25-ea brd ff:ff:ff:ff:ff:ff`
+
+Interpretation:  
+• `ens18` = Ethernet device (currently DOWN).  
+• `wlan0` = Wireless adapter (currently DOWN, to be configured later).  
+Take note of your actual device names.
+
+If you see something like this:
+
+`2: ens18: <BROADCAST,MULTICAST,UP,LOWER_UP> mtu 1500 qdisc fq_codel state UP group default qlen 1000
+    inet 192.168.0.149/24 brd 192.168.0.255 scope global dynamic noprefixroute`
+
+→ Your Ethernet device is already connected. Congratulations! You should already have internet access.
+
+If you see interfaces such as:
+
+`4: br-bd78161b2e72: <NO-CARRIER,BROADCAST,MULTICAST,UP> ...
+5: docker0: <NO-CARRIER,BROADCAST,MULTICAST,UP> ...`
+
+→ ⚠️ You are not running from the Arch ISO environment. ⚠️
+Likely you booted into another OS.  
+Stop here and re-examine your setup!
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════════ Task: Check the TPM ═╗  
+Let’s confirm you have a working **Trusted Platform Module (TPM):**
+
+`# ls /dev/tpm*`
+
+If your system has a TPM, you should see output similar to:
+
+`crw-rw---- 1 tss  root  10,   224 Aug 22 13:05 /dev/tpm0
+crw-rw---- 1 root tss  253, 65536 Aug 22 13:05 /dev/tpmrm0`
+
+If you do not see these devices, it is not recommended to proceed with this guide.
+
+⚠️ Important Note ⚠️
+This setup uses full disk encryption with Clevis. The boot partition will be encrypted, and we will not integrate a keyfile into the initramfs.
+- If you are using UEFI without TPM, the guide can still be followed. However:
+  - You will be prompted twice for your root partition password during boot.
+  - This can be an acceptable compromise, but think carefully before continuing.
+╚══════════════════════════════════════════════════════════════════════╝
+
+Now that we have a general understanding of what we're working with, let's move on to the initial setup.
+
+
+
+════════════════════════════════════════════════════════════════════════
+                                           SECTION 2: WIFI & NETWORKING
+════════════════════════════════════════════════════════════════════════
+
+NOTE: If your system already has an active Ethernet connection (discovered in "SYSTEM CHECKS" → "Detect network interfaces"), you can skip the WiFi and DHCP/Manual IP tasks. Go directly to "Check Internet Connection."
+
+╔═════════════════════════════════════════════════════════ Task: WiFi ═╗
+If you do not have an active Ethernet link, use iwd to configure WiFi:
+
+`# iwctl
+[iwd] station list`
+
+Identify your WiFi adapter (typically "wlan0"):
+
+`[iwd] station wlan0 scan
+[iwd] station wlan0 get-networks`
+
+Connect to your network:
+
+`[iwd] station wlan0 connect YOUR-NETWORK-SSID
+[iwd] exit`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════ Task: DHCP/Manual IP ═╗
+Most networks use DHCP, which Arch ISO's NetworkManager handles automatically.  
+If your network does not provide DHCP, manually assign an IP address:
+
+`# ip addr add 192.168.1.50/24 dev ens18
+# ip link set ens18 up
+# ip route add default via 192.168.1.1`
+
+Assumptions:
+- Configuring `ens18` (Ethernet adapter).  
+- Default gateway at `192.168.1.1` (adjust for your network).  
+- Replace values with your network's configuration.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════ Task: Check Internet Connection ═╗
+Whether via Ethernet or WiFi, confirm Internet connectivity:
+
+`# ping -c 3 www.archlinux.org`
+
+Alternative if `archlinux.org` is unreachable:
+
+`# ping -c 3 8.8.8.8`
+
+Successful replies indicate you have a working Internet connection.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════ Task: Enable SSH access ═╗
+Optionally enable SSH to control the installer from another machine:
+
+Set a root password:
+
+`# passwd`
+
+Start the sshd daemon:
+
+`# systemctl start sshd`
+
+Confirm the installer's IP address:
+
+`# ip a`
+
+SSH into the live installer from another PC:
+
+`$ ssh root@<installer-IP-address>`
+
+Why enable SSH? Copy/pasting commands from this guide remotely is much easier than typing each command manually.
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+
+════════════════════════════════════════════════════════════════════════
+                                                  SECTION 3: PARTITIONS
+════════════════════════════════════════════════════════════════════════
+
+NOTE: The astute will notice some strangeness in my partitioning scheme... there is method to my madness.
+
+We will be building a recovery partition, standing right next to the EFI partition. This recovery partition is not just for emergencies — it’s a second, bootable Arch installation. However, for the sake of security it too will get the full encryption treatment.
+
+╔════════════════════════════════════ Task: Build the Partition Table ═╗
+`# cfdisk /dev/sda`
+
+Use GPT for partition type, then follow these steps:
+
+`">> Free space" -> [New] -> 512M -> [Type] -> EFI System
+">> Free space" -> [New] -> 12G
+">> Free space" -> [New] -> MAX SIZE
+[Write] -> type "yes" -> [Quit]`
+
+NOTE: the second partition is the future recovery drive.
+- I set it to 12GB. you can expand or shrink this if you like.
+  - For recovery, 6–8GB is enough for CLI-only. 10–12GB if you want to add a light GUI.
+  - Anything larger is just comfort room.
+
+Remember to check your work!
+`# lsblk`
+
+Your drives should now look something like this:
+`NAME   MAJ:MIN RM   SIZE RO TYPE MOUNTPOINTS
+loop0    7:0    0 959.8M  1 loop /run/archiso/airootfs
+sda      8:0    0   256G  0 disk 
+├─sda1   8:1    0   512M  0 part 
+├─sda2   8:2    0    12G  0 part 
+└─sda3   8:3    0 243.5G  0 part 
+sr0     11:0    1   1.3G  0 rom  /run/archiso/bootmnt`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════ Task: Encrypt All the things! ═╗
+Encrypt the target partitions with LUKS (Linux Unified Key Setup)
+- All options here are chosen to ensure compatibility with GRUB, SSDs, and strong encryption.
+
+`# cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda2`
+`# cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda3`
+(Note: GRUB does not support LUKS2 yet, hence `--type luks1`, and it's very picky about iter-time and sector-size. Unless you know what your doing, just leave the command as-is.)
+
+→ Follow the prompts, but as a security note, this guide expects you to use a **STRONG** password. A weak password will negate any efforts we go through to secure your computer.
+
+What qualifies as a strong password? 
+- Use a strong passphrase! (see [XKCD 936](https://xkcd.com/936/) for inspiration)
+- If you want something generated, try [xkpasswd.net](https://www.xkpasswd.net/)
+- Though it would be **more secure** to use diferent passwords on each partition, you **can** use the same password on both if you need to.
+  
+Now, Open the newly encrypted partitions:
+`# cryptsetup luksOpen /dev/sda2 cryptrec`
+`# cryptsetup luksOpen /dev/sda3 cryptsys`
+
+And once again, let's check your work!
+`# lsblk`
+
+Your drives should now look something like this:
+`NAME         MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
+loop0          7:0    0 959.8M  1 loop  /run/archiso/airootfs
+sda            8:0    0   256G  0 disk  
+├─sda1         8:1    0   512M  0 part  
+├─sda2         8:2    0    12G  0 part  
+│ └─cryptrec 253:0    0    12G  0 crypt 
+└─sda3         8:3    0 243.5G  0 part  
+  └─cryptsys 253:1    0 243.5G  0 crypt 
+sr0           11:0    1   1.3G  0 rom   /run/archiso/bootmnt`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════════════════════════════ Task: Swap Calculation ═╗
+How much swap do you need?  
+
+The old rule of thumb was 2.5× your RAM—back when 4 GB was considered “friken' **HUGE**.” Nowadays, 64 GB of RAM isn’t entirely unreasonable.
+
+As of this writing, most systems only need a couple of gigabytes of swap—unless you want **hibernation/resume**. In that case, you need roughly the same amount as your RAM, plus a little overhead.
+
+Let’s calculate it with a simple one-liner:
+
+`# awk '/MemTotal/ {ram=$2/1024; swap=(ram<2048?ram*2:(ram>65536?65536:ram+4096)); printf "%.0f\n", swap}' /proc/meminfo`
+
+This prints a single number. Take note of it!
+
+The logic behind this number:
+> • If RAM < 2 GB → swap = 2× RAM (small systems need more swap)  
+> • If RAM > 64 GB → swap capped at 64 GB (no need for enormous swap)  
+> • Otherwise → swap = RAM + 4 GB (covers hibernation)
+
+If you have 64 GB or more of RAM… congratulations! You probably don’t need swap.  
+If you need extra swap with 64 GB+ of RAM… maybe reconsider why. :/
+
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════════ Task: Setup LVMs ═╗
+We’re now going to carve up cryptsys into logical volumes for root and swap.
+
+Initialize the encrypted volume for LVM
+`# pvcreate /dev/mapper/cryptsys`
+
+Create a volume group named 'lvm' on the encrypted volume
+`# vgcreate lvm /dev/mapper/cryptsys`
+
+Create a root logical volume of 1 GB (we'll resize later if needed)
+`# lvcreate -L 1G lvm -n root`
+
+Create a swap logical volume using the number you noted from the "Swap Calculation" task
+`# lvcreate -L <SWAP_SIZE>M lvm -n swap`
+
+→ Replace `<SWAP_SIZE>` with the number output from the swap calculation command. Yes, copy/paste that number here.
+
+Extend the root volume to use all remaining free space
+`# lvextend -l 100%FREE /dev/mapper/lvm-root`
+
+Lets check it again!
+`# lsblk`
+
+`NAME           MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
+loop0            7:0    0 959.8M  1 loop  /run/archiso/airootfs
+sda              8:0    0   256G  0 disk  
+├─sda1           8:1    0   512M  0 part  
+├─sda2           8:2    0    12G  0 part  
+│ └─cryptrec   253:0    0    12G  0 crypt 
+└─sda3           8:3    0 243.5G  0 part  
+  └─cryptsys   253:1    0 243.5G  0 crypt 
+    ├─lvm-root 253:2    0 234.7G  0 lvm   
+    └─lvm-swap 253:3    0   7.8G  0 lvm   
+sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════════ Task: Format Partitions ═╗
+# EFI
+mkfs.fat -F32 /dev/sda1
+
+# Recovery (keep simple ext4)
+mkfs.ext4 -L recovery /dev/mapper/cryptrec
+
+# Root (Btrfs)
+mkfs.btrfs -L root /dev/mapper/lvm-root
+
+# Swap
+mkswap /dev/mapper/lvm-swap
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════════ Task: Setup btrfs ═╗
+# Temp mount to create subvols
+mount /dev/mapper/lvm-root /mnt
+
+btrfs subvolume create /mnt/@
+btrfs subvolume create /mnt/@home
+btrfs subvolume create /mnt/@varlog
+btrfs subvolume create /mnt/@varcache
+btrfs subvolume create /mnt/@varlibpacman
+btrfs subvolume create /mnt/@vartmp
+
+# Sanity check
+btrfs subvolume list /mnt
+
+# You should see something like this:
+ID 256 gen 9 top level 5 path @
+ID 257 gen 10 top level 5 path @home
+ID 258 gen 10 top level 5 path @varlog
+ID 259 gen 10 top level 5 path @varcache
+ID 260 gen 11 top level 5 path @varlibpacman
+ID 261 gen 11 top level 5 path @vartmp
+
+# Unmount `/dev/mapper/lvm-root` (THIS IS NECESSARY! Do not skip!)
+umount /mnt
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════ Task: Prepare the build space ═╗
+# Mount root (compressed)
+mount -o ssd,noatime,compress=zstd:3,space_cache=v2,discard=async,subvol=@ /dev/mapper/lvm-root /mnt
+
+# Create mount points
+mkdir -p /mnt/{boot/efi,home,var/log,var/cache,var/lib/pacman,var/tmp,recovery}
+
+# EFI (secure, minimal writes)
+mount -o umask=0077 /dev/sda1 /mnt/boot/efi
+
+# Home (compressed)
+mount -o ssd,noatime,compress=zstd:3,space_cache=v2,discard=async,subvol=@home /dev/mapper/lvm-root /mnt/home
+
+# Logs (no compression; keep CoW/checksums)
+mount -o ssd,noatime,nocompress,space_cache=v2,discard=async,subvol=@varlog /dev/mapper/lvm-root /mnt/var/log
+
+# Cache/tmp/pacman (no CoW, no compression)
+mount -o ssd,noatime,nodatacow,nocompress,space_cache=v2,discard=async,subvol=@varcache /dev/mapper/lvm-root /mnt/var/cache
+mount -o ssd,noatime,nodatacow,nocompress,space_cache=v2,discard=async,subvol=@vartmp /dev/mapper/lvm-root /mnt/var/tmp
+mount -o ssd,noatime,nodatacow,nocompress,space_cache=v2,discard=async,subvol=@varlibpacman /dev/mapper/lvm-root /mnt/var/lib/pacman
+
+# make NOCOW persistent for new files in these subvolumes (Optional)
+chattr +C /mnt/var/cache
+chattr +C /mnt/var/tmp
+chattr -R +C /mnt/var/lib/pacman
+
+# Recovery (quiet, fewer writes; safe journaling)
+mount -o noatime,discard=async,data=ordered,commit=120 /dev/mapper/cryptrec /mnt/recovery
+
+# Enable swap
+swapon /dev/mapper/lvm-swap
+
+# Sanity check
+lsblk
+
+# Your partition layout should look like this (disk sizes will not match):
+NAME           MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
+loop0            7:0    0 959.8M  1 loop  /run/archiso/airootfs
+sda              8:0    0   256G  0 disk  
+├─sda1           8:1    0   512M  0 part  /mnt/boot/efi
+├─sda2           8:2    0    12G  0 part  
+│ └─cryptrec   253:0    0    12G  0 crypt /mnt/recovery
+└─sda3           8:3    0 243.5G  0 part  
+  └─cryptsys   253:1    0 243.5G  0 crypt 
+    ├─lvm-root 253:2    0 234.7G  0 lvm   /mnt
+    └─lvm-swap 253:3    0   7.8G  0 lvm   [SWAP]
+sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+EFI, root, swap, and recovery are set up, encrypted, formatted, and mounted.
+You are ready to install the base system.
+
+
+
+════════════════════════════════════════════════════════════════════════
+                                                SECTION 4: INSTALLATION
+════════════════════════════════════════════════════════════════════════
+
+╔════════════════════════════════════ Task: Install the base packages ═╗
+Refresh pacman/repos (may not be necessary):
+`# pacman -Syy`
+
+Install base packages into /mnt:
+`# pacstrap -i /mnt base linux linux-firmware nano grub efibootmgr`
+
+NOTES:
+- When prompted, install iptables-nft (2)
+- When prompted, install mkinitcpio (1)
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════ Task: Run pre-chroot configuration═╗
+Generate fstab:
+`# genfstab -U /mnt >> /mnt/etc/fstab`
+
+Get UUID of the luks container and add it to the grub config file (**THIS MUST BE DONE OUTSIDE CHROOT**):
+`# cryptsetup luksUUID /dev/sda3 >> /mnt/etc/default/grub`
+
+NOTE: We capture the luksUUID here to simplify editing GRUB later inside the chroot. It will be used for GRUB_CMDLINE_LINUX’s cryptdevice parameter.
+
+Reminder: /dev/sda3 is the main system (cryptsys). 
+We’ll capture /dev/sda2 (recovery) later when we set up *its* GRUB.
+
+Double check system config files:
+`# cat /mnt/etc/fstab`
+`# cat /mnt/etc/pacman.d/mirrorlist`
+`# cat /mnt/etc/default/grub`
+`# cat /mnt/etc/mkinitcpio.conf`
+
+Note: you're mostly making sure they're where they belong.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════ Task: chroot into the build area ═╗
+`# arch-chroot /mnt /bin/bash`
+╚══════════════════════════════════════════════════════════════════════╝
+
+You are now inside your new system. All following commands affect the installed OS, not the live ISO.
+
+╔═════════════════════════════════════════ Task: Install needed tools ═╗
+Refresh the repositories.
+`# pacman -Syy`
+
+Install packages:
+`# pacman -S reflector git rsync clevis luksmeta tpm2-tools lvm2 cryptsetup iwd networkmanager openssh sudo`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════ Task: Enable Services ═╗
+# systemctl enable sshd.service
+# systemctl enable NetworkManager.service
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════ Task: Configure Date and Location ═╗
+Set the region info:
+`# ln -sf /usr/share/zoneinfo/[Region/City] /etc/localtime`
+
+NOTE: See available timezones with `ls /usr/share/zoneinfo`
+
+Set time:
+CHECK FIRST:
+`# date`
+THEN SET:
+`# timedatectl set-ntp true`
+`# hwclock --systohc`
+
+$$$NOTE TO SELF (or chatgpt if I gave this to you): is it possible to set the RTC from here? Should be correct, but I want to be thourough. might even add a line about checking the RTC battery. lol.$$$
+
+Generate Locale info:
+`# echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen`
+`# locale-gen`
+`# echo LANG=en_US.UTF-8 > /etc/locale.conf`
+`# echo LC_MESSAGES=en_US.UTF-8 >> /etc/locale.conf`
+NOTE: I'm in the US so I used "en_US.UTF-8". See [this wiki page](https://wiki.archlinux.org/title/Locale#Generating_locales) for more information on your own location details.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════════ Task: Set the computer name ═╗
+Set the computer name:
+`# echo "$PCNAME" > /etc/hostname`
+`# echo 127.0.0.1	$PCNAME >> /etc/hosts`
+`# echo 127.0.1.1	$PCNAME.localdomain	$PCNAME >> /etc/hosts`
+NOTES:
+- Obviously replace "$PCNAME" with your preferred computer name.
+- Also, feel free to set your domain name, if you have one.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════ Task: Configure users ═╗
+Set the root password:
+`# passwd`
+
+Configure sudo:
+`# EDITOR=nano visudo`
+
+Look for and uncomment the following:
+`%wheel      ALL=(ALL) ALL`
+
+Configure your user:
+`# useradd -m -G lp,users,games,wheel -s /bin/bash $USERNAME`
+`# passwd $USERNAME`
+
+NOTE: Change "$USERNAME" to your preferred username.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════════════════════════════════ Task: Setup clevis ═╗
+Clone the mkinitcpio-clevis-hook from git:
+`# cd /tmp`
+`# git clone https://github.com/kishorviswanathan/arch-mkinitcpio-clevis-hook.git`
+`# cd arch-mkinitcpio-clevis-hook/`
+`# sh install.sh`
+
+NOTES:
+- DO NOT ACTUALLY BUILD THE HOOK FROM THE AUR!
+- All we need from this specific git clone are the hook and install files (2 short scripts). 
+- The install.sh script we ran simply copies these files to the relevant locations for mkinitcpio.
+- I was very tempted to rip off kishorviswanathan and paste the scripts here directly... but proper attribution is in order!
+- kishorviswanathan is the GOAT!
+
+SECOND NOTE: we wont be binding luks to tpm just yet... we need to finalize the EFI with recovery first else clevis autounlock will fail.
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+╔═════════════════════════════════════════ Task: Edit mkinitcpio.conf ═╗
+NOTE: there is a LOT going on here.
+- We are configuring zstd kernel compression
+- We are adding our primary hooks.
+- We are adding the clevis hook (to unlock cryptsys)
+- We are enabling kms and the associated modules (if applicable)
+
+`# nano /etc/mkinitcpio.conf`
+
+KMS for AMD/Radeon GPUs:
+Modify MODULES to include the following:
+`MODULES=(amdgpu)`
+
+NOTE: DO NOT USE THIS IF YOU HAVE AN AMD/RADEON/NVIDIA GPU!
+Won't hurt. Just won't work.
+
+KMS for Intel Graphics:
+Modify MODULES to include the following:
+`MODULES=(i915)`
+
+NOTE: DO NOT USE THIS IF YOU HAVE AN INTEL/NVIDIA GPU!
+Won't hurt. Just won't work.
+
+KMS for nvidia/nouveau GPUs:
+`======================================================================
+
+    "Fuck you nvidia!"
+	
+		            --Linus Torvalds
+				
+======================================================================`
+
+For proprietary nvidia driver users, early KMS is not supported. You’ll get modesetting later in the boot, but that's all nvidia will deign to give you.
+
+NOTE: For those installing on virtualbox, vmware, proxmox and other such hypervisors, the kms HOOK is essential for the initial boot stages! Else you will get a black screen and no indicator of what's going on. Otherwise, the associated MODULES are unnecessary.
+	
+For more useful info on Kernel Mode Setting (KMS) See the [wiki page](https://wiki.archlinux.org/title/Kernel_mode_setting#Early_KMS_start)
+
+
+Next, modify HOOKS similar to this:
+`HOOKS=(base udev autodetect microcode modconf kms keyboard keymap block clevis encrypt lvm2 filesystems)`
+
+NOTES: 
+- I find it easiest to simply comment out the existing HOOKS line, then just paste in this line right below it.
+- Bear in mind, this is *MY* hooks section! You should definitly read [the wiki page](https://wiki.archlinux.org/title/Mkinitcpio#Common_hooks) on hooks.
+
+
+Finally, for zstd compression, uncomment the following:
+`COMPRESSION="zstd"`
+    
+Save and exit nano: 
+`CTRL+X >> CTRL+Y >> [ENTER]`
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+╔═════════════════════════════════════════════ Task: Edit grub config ═╗
+`# nano /etc/default/grub`
+
+Modify GRUB_CMDLINE_LINUX to inform clevis which device to decrypt at boot: 
+`GRUB_CMDLINE_LINUX="cryptdevice=UUID=<luksUUID-of-/dev/sda3>:cryptsys"`
+
+Uncomment/Add the following:
+`GRUB_ENABLE_CRYPTODISK=y`
+
+NOTES:
+- The UUID should be at the bottom of the file. 
+- The UUID was added to the file earlier using `cryptsetup luksUUID /dev/sda3 >> /mnt/etc/default/grub`
+- I find it best to move the cursor to the bottom line, use CTRL-K to cut the line, then reposition to where you want to paste it, and use CTRL-U.
+- Make sure you delete the UUID from the bottom of the file if you don't use CTRL+K. Leaving it will cause errors!
+
+Save and exit nano: 
+`CTRL+X >> CTRL+Y >> [ENTER]`
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+╔════════════════════════════════════════ Task: Install ucode for KMS ═╗
+For AMD/Radeon graphics cards and iGPUs:
+`# pacman -S amd-ucode`
+
+For Intel graphics cards and iGPUs:
+`# pacman -S intel-ucode`
+
+NOTES:
+- It's best to only install the ucode applicable to your GUP/iGPU however, it won't hurt if both get installed. It's just a waste of time and space is all.
+- For nvidia/nouveau, check the [wiki article on early kms start](https://wiki.archlinux.org/title/Kernel_mode_setting#Early_KMS_start) ...and may god have mercy on your soul.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════════════ Task: Build/Install initramfs and grub ═╗
+Build the kernel image:
+`# mkinitcpio -P linux`
+
+NOTES:
+- It **should not** be necessary to build the kernel image if you installed a ucode package (a hook triggers mkinitcpio during package installation).
+- If errors occured and you've already corrected them, or if you skipped ucode installation, then run this before continuing.
+
+Install the boot loader:
+`# grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ARCH`
+`# grub-mkconfig -o /boot/grub/grub.cfg`
+╚══════════════════════════════════════════════════════════════════════╝
+
+At this point, you have a fully functional Arch install with full disk encryption.
+You *could* exit chroot, unmount the partitions, and reboot now... But lets get that recovery partition built first!
+
+
+
+════════════════════════════════════════════════════════════════════════
+                                               SECTION 5: RECOVERY PREP
+════════════════════════════════════════════════════════════════════════
+
+╔═════════════════════════════════════════════════ Task: Swap Install ═╗
+`# exit`
+`# umount -R /mnt`
+`# swapoff /dev/mapper/lvm-swap`
+
+let's refresh our memory, where is everything?
+`NAME           MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
+loop0            7:0    0 959.8M  1 loop  /run/archiso/airootfs
+sda              8:0    0   256G  0 disk  
+├─sda1           8:1    0   512M  0 part  
+├─sda2           8:2    0    12G  0 part  
+│ └─cryptrec   253:0    0    12G  0 crypt 
+└─sda3           8:3    0 243.5G  0 part  
+  └─cryptsys   253:1    0 243.5G  0 crypt 
+    ├─lvm-root 253:2    0 234.7G  0 lvm   
+    └─lvm-swap 253:3    0   7.8G  0 lvm
+sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt`
+
+Now lets mount the recovery partitions:
+`# mount /dev/mapper/cryptrec /mnt`
+> Note: We will *not* use any mount optimizations for recovery. the more simple the setup, the better.  
+
+Create the EFI mount point and *re*-mount the EFI partition (we're using the same EFI for simplicity):
+`# mkdir -p /mnt/boot/efi`
+`# mount /dev/sda1 /mnt/boot/efi`
+
+Now let's check things are where they belong!
+`# lsblk`
+
+→ Your partition layout should look like this (disk sizes will not match):
+`NAME           MAJ:MIN RM   SIZE RO TYPE  MOUNTPOINTS
+loop0            7:0    0 959.8M  1 loop  /run/archiso/airootfs
+sda              8:0    0   256G  0 disk  
+├─sda1           8:1    0   512M  0 part  /mnt/boot/efi
+├─sda2           8:2    0    12G  0 part  
+│ └─cryptrec   253:0    0    12G  0 crypt /mnt
+└─sda3           8:3    0 243.5G  0 part  
+  └─cryptsys   253:1    0 243.5G  0 crypt 
+    ├─lvm-root 253:2    0 234.7G  0 lvm   
+    └─lvm-swap 253:3    0   7.8G  0 lvm   
+sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt`
+╚══════════════════════════════════════════════════════════════════════╝
+
+EFI and root of the recovery system are mounted.
+You are ready to install the recovery system.
+
+
+
+════════════════════════════════════════════════════════════════════════
+                                       SECTION 6: RECOVERY INSTALLATION
+════════════════════════════════════════════════════════════════════════
+
+NOTE: We're just going to **run* through these steps as they are mostly duplicates from above.
+
+╔════════════════════════════════════ Task: Install the base packages ═╗
+`# pacstrap -i /mnt base linux linux-firmware nano grub efibootmgr`
+
+NOTES:
+- When prompted, install iptables-nft (2)
+- When prompted, install mkinitcpio (1)
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════ Task: Run pre-chroot configuration═╗
+`# genfstab -U /mnt >> /mnt/etc/fstab`
+`# cryptsetup luksUUID /dev/sda2 >> /mnt/etc/default/grub`
+
+Double check system config files:
+`# cat /mnt/etc/fstab`
+`# cat /mnt/etc/pacman.d/mirrorlist`
+`# cat /mnt/etc/default/grub`
+`# cat /mnt/etc/mkinitcpio.conf`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════ Task: chroot into the recovery build area ═╗
+`# arch-chroot /mnt /bin/bash`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════ Task: Install needed tools for recovery ═╗
+`# pacman -Syy`
+`# pacman -S reflector git rsync clevis luksmeta tpm2-tools lvm2 cryptsetup iwd networkmanager openssh sudo`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════════ Task: Enable Services ═╗
+# systemctl enable sshd NetworkManager
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════════ Task: Configure recovery Date and Location ═╗
+`# ln -sf /usr/share/zoneinfo/[Region/City] /etc/localtime`
+
+NOTE: See available timezones with `ls /usr/share/zoneinfo`
+
+`# timedatectl set-ntp true`
+`# echo "en_US.UTF-8 UTF-8" >> /etc/locale.gen`
+`# locale-gen`
+`# echo LANG=en_US.UTF-8 > /etc/locale.conf`
+`# echo LC_MESSAGES=en_US.UTF-8 >> /etc/locale.conf`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════ Task: Set the recovery computer name ═╗
+Set the computer name:
+`# echo recovery > /etc/hostname`
+`# echo 127.0.0.1	recovery >> /etc/hosts`
+`# echo 127.0.1.1	recovery.localdomain	recovery >> /etc/hosts`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════════════════════ Task: Configure recovery users ═╗
+Set the root password:
+`# passwd`
+
+Configure sudo:
+`# EDITOR=nano visudo`
+
+Look for and uncomment the following:
+`%wheel      ALL=(ALL) ALL`
+
+Configure your user:
+`# useradd -m -G lp,users,games,wheel -s /bin/bash recuser
+`# passwd recuser
+
+NOTE: You can change "recuser" to your preferred username. but make it unique from your main account.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════ Task: Edit recovery mkinitcpio.conf ═╗
+`# nano /etc/mkinitcpio.conf`
+
+KMS for AMD/Radeon GPUs:
+`MODULES=(amdgpu)`
+
+KMS for Intel Graphics:
+`MODULES=(i915)`
+
+Modify HOOKS similar to this:
+`HOOKS=(base udev autodetect microcode modconf kms keyboard keymap block encrypt lvm2 filesystems)`
+
+For zstd compression, uncomment the following:
+`COMPRESSION="zstd"`
+    
+Save and exit nano: 
+`CTRL+X >> CTRL+Y >> [ENTER]`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔════════════════════════════════════ Task: Edit recovery grub config ═╗
+`# nano /etc/default/grub`
+
+Modify GRUB_CMDLINE_LINUX to inform initramfs and clevis which device to decrypt at boot: 
+`GRUB_CMDLINE_LINUX="cryptdevice=UUID=<luksUUID-of-/dev/sda2>:cryptrec"`
+
+Uncomment/Add the following:
+`GRUB_ENABLE_CRYPTODISK=y`
+
+NOTES:
+- The UUID should be at the bottom of the file. Use CTRL-K to cut the line, then reposition to where you want to paste it, and use CTRL-U.
+- Make sure you delete the UUID from the bottom of the file if you don't use CTRL+K. Leaving it will cause errors!
+
+Save and exit nano: 
+`CTRL+X >> CTRL+Y >> [ENTER]`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════════════ Task: Build/Install initramfs and grub ═╗
+Build the kernel image:
+`# mkinitcpio -P linux`
+
+Install the boot loader:
+`# grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=RECOVERY`
+`# grub-mkconfig -o /boot/grub/grub.cfg`
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════════ Task: Set the boot device in EFI firmware! ═╗
+Check the existing EFI boot setup:
+# efibootmgr
+
+Example output:
+BootCurrent: 0001
+Timeout: 3 seconds
+BootOrder: 0005,0004,0003,0002,0001,0000
+Boot0000* UiApp	...
+Boot0001* UEFI QEMU DVD-ROM QM00003 ...
+Boot0002* UEFI QEMU QEMU HARDDISK ...
+Boot0003* Windows Boot Manager ...
+Boot0004* ARCH ...
+Boot0005* RECOVERY ...
+
+The entries for "ARCH" and "RECOVERY" were added in that order; currently "RECOVERY" is the top boot priority.
+We need to change the boot order to load "ARCH" first, then "RECOVERY", then everything else in their existing order.
+
+Change the EFI boot order:
+`# efibootmgr -o 0004,0005,0003,0002,0001,0000`
+
+WARNING: Do **not** omit or skip any entries listed in the current BootOrder. Firmware can behave unpredictably if entries are missing.
+
+NOTE: It is safe to remove superfluous entries if desired. For example, to delete the Windows Boot Manager entry shown above:
+`# efibootmgr -b 0005 -B`
+
+This removes the entry from NVRAM. The BootOrder will still reference the deleted number until explicitly reordered, but firmware will skip it automatically. It's important to do this *now* before moving on, or be at peace with the current setup!
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔═════════════════════ Task: Configure the LUKS/TPM2 bind with Clevis ═╗
+`# clevis luks bind -d /dev/sda3 tpm2 '{"pcr_bank":"sha256","pcr_ids":"0,4,7"}'`
+
+NOTES:
+- tpm2 requires "pcr_bank" to specify the hash algorithm; "sha256" is recommended for security.
+- "pcr_ids" 0, 4, and 7 correspond to BIOS/firmware and EFI bootloader measurements:
+  - PCR 0: Changes if the system firmware ("BIOS") is updated.
+  - PCR 4: Changes if you modify the bootloader or kernel (including updates).
+  - PCR 7: Typically reserved for “boot policy” measurements, reflecting the boot manager state. Concretely, this includes:
+      - The EFI boot entry selected by default.
+      - EFI Boot Manager variables, such as BootOrder, BootNext, and sometimes Boot#### entries.
+      - Secure Boot state and policy keys (KEK/PK/DB/DBX) if enabled.
+      - Certain firmware-specific settings that influence the boot path.
+      
+PCR 7 usually remains stable, which is why we ensured the boot manager was correctly set **before** running this command.
+╚══════════════════════════════════════════════════════════════════════╝
+
+╔══════════════════════════════════════════ Task: unmount and reboot! ═╗
+`# exit`
+`# umount -R /mnt`
+`# swapoff /dev/mapper/lvm-swap`
+`# reboot`
+╚══════════════════════════════════════════════════════════════════════╝
+
+
+
+
+
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+***********************************************************************
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+`# nano /mnt/etc/pacman.conf`
+Uncomment these lines to enable the multilib repo:
+`[multilib]
+Include = /etc/pacman.d/mirrorlist`
+
+
+nvme-cli dosfstools e2fsprogs htop iotop 
+
+
+
+
+
+
+
+***********************************************************************
+***********************************************************************
+
+
+
+
+***********************************************************************
+***********************************************************************
+       [Setup MKINITCPIO and GRUB]
+***********************************************************************
+***********************************************************************
+
+
+
+
+
+
+
+
+
+
+OR you could stick arround and install your UI, apps, and games!
+
+
+OPTION 1) Reboot the thing!!!
++----------------------------------------------------------------------
+# exit
+# umount -R /mnt
+# reboot
++----------------------------------------------------------------------
+
+
+OPTION 2...
+
+
+
+
+***********************************************************************
+***********************************************************************
+       [INTALL ALL THE THINGS!!!]
+***********************************************************************
+***********************************************************************
+
+
+2nd stage Install Packages:
++----------------------------------------------------------------------
+# pacman -Syy
+
+::xfce4 (DO NOT INSTALL IF USING CINNAMON)::
+# pacman -S \
+    xfce4                   # Core XFCE desktop environment \
+    xfce4-goodies           # Extra XFCE plugins and tools \
+    lightdm                 # Display manager (login screen) \
+    lightdm-gtk-greeter     # GTK greeter/theme for LightDM \
+    xfce4-clipman-plugin    # Clipboard manager plugin for XFCE \
+    thunar-volman           # Automount removable media in Thunar \
+    ttf-dejavu              # Common TTF font set \
+    ttf-liberation          # Metrics-compatible fonts (good for MS Office docs) \
+    ttf-hack                # Popular developer/console font \
+    network-manager-applet  # System tray applet for NetworkManager \
+    bluez                   # Bluetooth protocol stack \
+    bluez-utils             # CLI Bluetooth tools (scan, pair, etc.) \
+    blueman                 # GUI Bluetooth manager
+# systemctl enable lightdm.service
+# systemctl enable bluetooth.service
+
+::Cinnamon (DO NOT INSTALL IF USING XFCE)::
+# pacman -S \
+    cinnamon                # Cinnamon desktop environment \
+    lightdm                 # Display manager \
+    lightdm-gtk-greeter     # GTK greeter for LightDM \
+    bluez                   # Bluetooth protocol stack \
+    bluez-utils             # CLI Bluetooth tools (scan, pair, etc.) \
+    blueman                 # GUI Bluetooth manager
+# systemctl enable lightdm.service
+# systemctl enable bluetooth.service
+
+::printers::
+# pacman -S \
+    cups                    # Printing system (CUPS) \
+    hplip                   # HP printer drivers/tools \
+    system-config-printer   # GUI printer setup tool
+# systemctl enable cups.service
+
+::Internetz::
+# pacman -S \
+    chromium                # Web browser (Chromium) \
+    firefox                 # Web browser (Firefox) \
+    transmission-cli        # BitTorrent client (CLI) \
+    transmission-gtk        # BitTorrent client (GUI) \
+    filezilla               # FTP/SFTP client
+
+::Office / Productivity::
+# pacman -S \
+    libreoffice-still       # LibreOffice stable release (Writer, Calc, etc.) \
+    hunspell-en_us          # Spellchecking dictionary (American English) \
+    hyphen-en               # Hyphenation rules (English) \
+    aspell-en               # Aspell spellchecker dictionary (English) \
+    evince                  # Lightweight PDF/document viewer \
+    gnome-calculator        # Basic desktop calculator \
+    thunderbird             # Email client \
+    evolution               # Email & calendar client
+
+::Utilities / System Tools / Necessities::
+# pacman -S \
+    avahi                   # Zeroconf/Bonjour service discovery on LAN \
+    bash-completion         # Tab-completion for bash commands \
+    dialog                  # Text-mode dialog boxes for scripts \
+    nm-connection-editor    # GUI editor for NetworkManager profiles \
+    xdg-user-dirs           # Creates XDG standard user folders (Documents, etc.) \
+    xdg-utils               # Desktop helpers (open URLs, default apps, etc.) \
+    gvfs-smb                # GVFS backend for SMB shares (Thunar/Nautilus integration) \
+    exfatprogs              # Modern exFAT utilities (mkfs, fsck) \
+    hdparm                  # Disk/SSD tuning & benchmarking \
+    nfs-utils               # NFS filesystem support \
+    ntfs-3g                 # NTFS read/write support \
+    nvme-cli                # NVMe SSD management tools \
+    p7zip                   # 7z and archive utilities
+# systemctl enable avahi-daemon.service
+
+::Programming/Environment Frameworks::
+# pacman -S \
+    jdk-openjdk             # Current OpenJDK development kit (Java dev) \
+    python python-pip       # Python 3 + pip (package installer) \
+    mono                    # .NET / Mono runtime + SDK \
+    nodejs npm              # Node.js + package manager \
+    go                      # Go language compiler + tools \
+    rust                    # Rust toolchain (rustc, cargo, std libs)
+    wine                    # Wine Is Not an Emulator
+
+::Fun / Games::
+# pacman -S \
+    warzone2100             # Open-source RTS game \
+    lutris                  # Opensource games library manager \
+    steam                   # Steam client (gaming platform)
+
+::DEAD::
+    neofetch                # (Removed from repos; was system info fetch tool)
++----------------------------------------------------------------------
+
+Notes:
+- Use `libreoffice-fresh` instead of `-still` if you want the latest features instead of long-term stable.
+- `avahi` enables network printer & SMB discovery, but not strictly required unless you want Bonjour/zeroconf.
+- Steam requires `multilib` repo enabled in `/etc/pacman.conf`.
+
+
+
+
+***********************************************************************
+***********************************************************************
+       [Disaster Recovery]
+***********************************************************************
+***********************************************************************
+
+
+Firmware update broke clevis!
++----------------------------------------------------------------------
+- "pcr_ids" 0, 1, and 7 are associated with bios/firmware and the efi bootloader. These are unlikely to change unless you perform a firmware upgrade. In that event, you will need to clear the tpm and rebind... 
+
+FIGGURE THIS OUT!!!
+https://wiki.archlinux.org/title/Clevis#Bind_a_LUKS_volume
+
+cryptsetup luksDump /dev/sda2 <--lolwat?
+sudo clevis luks unbind -d /dev/sda2 -s <slot-id>
+sudo clevis luks bind -d /dev/sda2 tpm2 '{"pcr_ids":"0,1,7"}'
++----------------------------------------------------------------------
+
+
+
+
+
+
+
+
+Enable trim for SSDs (DON'T DO THIS IF YOU DON'T HAVE AN SSD!!!):
++----------------------------------------------------------------------
+# nano /etc/fstab
+	===================================================================
+	Just check that all the btrfs volumes look something like this:
+	> UUID=[$uuid-of-lvm-root] / btrfs rw,relatime,ssd,discard,space_cache=v2,subvolid=256 0 0
+	> UUID=[$uuid-of-lvm-root] /home btrfs rw,relatime,ssd,discard,space_cache=v2,subvolid=257 0 0
+	> UUID=[$uuid-of-lvm-root] /var/log btrfs rw,relatime,ssd,discard,space_cache=v2,subvolid=258 0 0
+	NOTE: specifically looking for ",ssd,discard"
+	===================================================================
+
+# nano /etc/lvm/lvm.conf
+	===================================================================
+	Look for "issue_discards", uncomment it and change to "1":
+	> issue_discards = 1
+	===================================================================
+	
+# nano /boot/loader/entries/arch.conf
+	===================================================================
+	Add "allow-discards" to the cryptdevice section
+	...
+	> options cryptdevice=UUID=[UUID-of-sda2]:crypt:allow-discards root=/dev/mapper/lvm-root resume=/dev/mapper/lvm-swap rw
+	...
+	===================================================================
+
+# systemctl enable fstrim.timer
++----------------------------------------------------------------------
+
+
+Reconnect to the network:
++----------------------------------------------------------------------
+iwctl
+[iwd] station list
+You're looking for your wifi adapter. Typically "wlan0"
+[iwd] station wlan0 scan
+[iwd] station wlan0 get-networks
+Look for your network SSID here
+[iwd] station wlan0 connect [$NETWORK-NAME]
++----------------------------------------------------------------------
+
+
+Update the arch repositories:
++----------------------------------------------------------------------
+UNNECESSARY AS OF NOW --> $ sudo cp /etc/pacman.d/mirrorlist /etc/pacman.d/mirrorlist.bak
+UNNECESSARY AS OF NOW --> $ sudo reflector -c US -a 6 --sort rate --save /etc/pacman.d/mirrorlist
+$ sudo pacman -Syyu
++----------------------------------------------------------------------
+
+
+3rd stage Install Packages:
++----------------------------------------------------------------------
+BASE:
+$ sudo pacman -S avahi bluez bluez-utils cups exfat-utils exfatprogs gtk2 gvfs-smb hdparm hplip jre8-openjdk neofetch nfs-utils ntfs-3g nvme-cli p7zip
+ 
+VIDEO DRIVERS (AMD):
+$ sudo pacman -S xf86-video-amdgpu
+ 
+VIDEO DRIVERS (INTEL):
+$ sudo pacman -S xf86-video-intel
+ 
+VIDEO DRIVERS (NVIDIA):
+https://wiki.archlinux.org/title/NVIDIA#Installation
+https://wiki.archlinux.org/title/NVIDIA_Optimus
+I can not help you beyond these links.
+May god have mercy on your soul.
+
+GUI (cinnamon):
+$ sudo pacman -S baobab blueberry cinnamon eog evince evolution filezilla firefox gedit gimp gnome-calculator gnome-keyring gnome-screenshot gnome-terminal libsecret nemo-fileroller notepadqq seahorse system-config-printer xf86-input-synaptics xorg-server xorg-xinit lightdm lightdm-slick-greeter
+
+MEDIA:
+$ sudo pacman -S alsa-utils audacious audacity ffmpeg gst-libav gst-plugins-bad gst-plugins-base gst-plugins-good gst-plugins-ugly handbrake libdvdcss libwebp pulseaudio pulseaudio-bluetooth vlc webp-pixbuf-loader youtube-dl
+
+PRODUCTIVITY:
+$ sudo pacman -S adobe-source-code-pro-fonts adobe-source-sans-fonts adobe-source-serif-fonts hunspell hunspell-en_us hyphen hyphen-en libmythes libreoffice-still mythes-en noto-fonts ttf-caladea ttf-carlito ttf-dejavu ttf-liberation ttf-linux-libertine-g
+
+FUN&GAMES:
+$ sudo pacman -S steam warzone2100 wesnoth
+
+PARANOIA!:
+$ sudo pacman -S keepassxc torbrowser-launcher veracrypt
++----------------------------------------------------------------------
+
+
+Configure LightDM:
++----------------------------------------------------------------------
+$ sudo nano /etc/lightdm/lightdm.conf
+	===================================================================
+	look for, uncomment, and update the following:
+	...
+	[Seat:*]
+	...
+	greeter-session=lightdm-slick-greeter
+	...
+	===================================================================
+$ sudo systemctl enable lightdm
+
+> AutoLogin:
+$ sudo nano /etc/lightdm/lightdm.conf
+	===================================================================
+	look for, uncomment, and update the following:
+	...
+	> [Seat:*]
+	...
+	> autologin-user=[$USERNAME]
+	> autologin-session=[$DESKTOP] <-- Find options using $ ls /usr/share/xsessions/*.desktop
+	...
+	===================================================================
+$ sudo groupadd -r autologin
+$ sudo gpasswd -a [$USERNAME] autologin
+
+NOTE: When asked to set a password for the login keyring, DO NOT SET ONE! 
+Just click "ok" and agree to leave passwords in plain text. 
+If somehow it takes the default user password, load seahorse and change the "login" keyring password to null.
++----------------------------------------------------------------------
+
+
+Enable additional services:
++----------------------------------------------------------------------
+$ sudo systemctl enable cups cups.socket bluetooth
++----------------------------------------------------------------------
+
+
+Install pamac:
++----------------------------------------------------------------------
+$ cd /tmp
+$ git clone https://aur.archlinux.org/libpamac-aur.git
+$ git clone https://aur.archlinux.org/pamac-aur.git
+$ cd /tmp/libpamac-aur && makepkg -si
+$ cd /tmp/pamac-aur && makepkg -si
+$ sudo nano /etc/pamac.conf
+	===================================================================
+	Look for and uncomment:
+	EnableAUR
+	===================================================================
+	> NOTE: I installed pamac, but I don't really use it to install AUR packages directly. I just like the notification option. YMMV.
++----------------------------------------------------------------------
+
+
+Plymouth-git:
++----------------------------------------------------------------------
+$ cd /tmp
+$ git clone https://aur.archlinux.org/plymouth-git.git
+$ cd /tmp/plymouth-git && makepkg -si && cd ..
+$ sudo nano /etc/plymouth/plymouthd.conf
+	===================================================================
+	Set the following:
+	ShowDelay=0
+	DeviceTimeout=1
+	===================================================================
+	
+$ sudo nano /etc/mkinitcpio.conf
+	===================================================================
+	Modify the Hooks to include the following:
+	...
+	> MODULES=(btrfs amdgpu) <-- FOR AMD ONLY!!!
+	> MODULES=(btrfs i915) <-- FOR INTEL ONLY!!!
+	...
+	> HOOKS=(... plymouth plymouth-encrypt ...)
+	...
+	===================================================================
+	
+$ sudo plymouth-set-default-theme -R [$THEME]
+	===================================================================
+	View available themes:
+	$ sudo plymouth-set-default-theme -l
+	Preview the current theme:
+	[CTRL+ALT+F6]
+	# plymouthd
+	# plymouth --show-splash
+	# plymouth --quit
+	NOTE: may have to go back to CTRL+ALT+F2 to do this...
+	NOTE#2: I like bgrt for efi...
+	===================================================================
+	
+> Seting the plymouth theme SHOULD kick off a kernel build. if not:
+$ sudo mkinitcpio -P linux
+
+$ sudo nano /boot/loader/entries/arch.conf
+	===================================================================
+	Add "splash" to the end of the options line.
+	> ...
+	> options ... rootflags=subvol=@ rw splash
+	===================================================================
+	
+$ sudo systemctl disable lightdm.service
+$ sudo systemctl enable lightdm-plymouth.service
++----------------------------------------------------------------------
+
+
+Set the screenshot's folder:
++----------------------------------------------------------------------
+$ mkdir ~/Pictures/Screenshots/
+$ gsettings set org.gnome.gnome-screenshot auto-save-directory file:///home/[$USERNAME]/Pictures/Screenshots/
++----------------------------------------------------------------------
+
+
+DONE AND DONE:
++----------------------------------------------------------------------
+$ sudo reboot
++----------------------------------------------------------------------
+
+
+
+***********************************************************************
+***********************************************************************
+ [END PRIMARY INSTALL]
+ [CONCLUDION]
+***********************************************************************
+***********************************************************************
+
+
+That's it! There's a whole lot more to do for me and most normal Arch users, but if you still need a guide (or if you needed one to begin with past the function of "crib notes"), Arch may not be the right distribution for you.
