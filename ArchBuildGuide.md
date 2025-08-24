@@ -2,6 +2,8 @@
                                                        About This Guide
 ════════════════════════════════════════════════════════════════════════
 
+Arch Build Guide - 2025.08.01-x86_64 - v3
+
 This document began as a personal reference for installing and configuring Arch Linux the way *I* prefer it—lean, secure, and optimized for modern hardware. I’ve chosen to publish it publicly in case others find it useful.
 
 That said, this is not a beginner’s Linux tutorial. The guide assumes you already have some familiarity with Linux and the command line. Specifically, it expects that you:
@@ -1383,3 +1385,4 @@ $ sudo reboot
 
 
 That's it! There's a whole lot more to do for me and most normal Arch users, but if you still need a guide (or if you needed one to begin with past the function of "crib notes"), Arch may not be the right distribution for you.
+
