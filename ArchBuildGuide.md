@@ -1,3 +1,5 @@
+
+
 # About This Guide
 
 This document began as a personal reference for building what I consider the *ideal Arch Linux system*—lean, secure, and tuned for modern hardware. I’ve chosen to publish it in case others find value in the same approach.
@@ -52,17 +54,17 @@ This double password prompt is a **red flag**. It doesn’t always mean your sys
 
 In maximum-paranoia terms: if an attacker somehow *had* access to your encrypted root (and therefore your initramfs), your system is already lost. The second prompt would still be a clue, but realistically you wouldn’t have the laptop back in that scenario unless the attacker wanted something they couldn’t get without tricking you.  
 
-Either way—benign update or hostile tampering—the second prompt deserves your full attention.
+Either way—benign update or hostile tampering—the second prompt deserves your full attention.  
 
 ---
 
 With expectations set, let’s begin the initial setup.
 
----
-
 # SECTION 1: SYSTEM CHECKS
 
-### **Task 1 - Verify boot mode**
+> ---
+
+###  **Task 1 - Verify boot mode**
 
 Check whether the system is booted in **UEFI mode** (required for this guide):
 ```bash
@@ -81,9 +83,10 @@ total 0
 These files are UEFI variables.  
 If the directory is empty, or does not exist, stop here and reboot the installer in **UEFI mode**.
 
----
 
-### **Task 2: Identify available storage devices**
+> ---
+
+###  **Task 2: Identify available storage devices**
 We need to confirm what disk(s) are present before partitioning:
 ```bash
 lsblk
@@ -102,9 +105,9 @@ Notes:
 - This guide will use `/dev/sda`. **replace with your actual device!**  
 - Copy/paste blindly at your own peril.
 
----
+> ---
 
-### **Task 3: Detect network interfaces**
+###  **Task 3: Detect network interfaces**
 
 Let’s check which devices exist, and whether one is already online:
 ```bash
@@ -113,12 +116,11 @@ ip a
 
 Example output:
 ```text
-1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc ... qlen 1000
-    inet 127.0.0.1/8 scope host lo
-       valid_lft forever preferred_lft forever
-2: ens18: <BROADCAST,MULTICAST> mtu 1500 qdisc ... qlen 1000
+1: lo: <LOOPBACK,UP,LOWER_UP> mtu 65536 qdisc noqueue state UNKNOWN group default qlen 1000
+    link/loopback 00:00:00:00:00:00 brd 00:00:00:00:00:00
+2: ens18: <BROADCAST,MULTICAST> mtu 1500 qdisc fq_codel state UP group default qlen 1000
     link/ether a7-dc-2c-ce-e2-fe brd ff:ff:ff:ff:ff:ff
-3: wlan0: <BROADCAST,MULTICAST> mtu 1500 qdisc ... qlen 1000
+3: wlan0: <BROADCAST,MULTICAST> mtu 1500 qdisc noqueue state DOWN group default qlen 1000
     link/ether 22-f5-7b-d6-25-ea brd ff:ff:ff:ff:ff:ff
 ```
 Interpretation:  
@@ -141,9 +143,11 @@ If you see interfaces such as:
 ```
 > ⚠️ You are not running from the Arch ISO environment. ⚠️ Likely you booted into another OS. Stop here and re-examine your setup!
 
----
 
-### **Task 4: Check the TPM**
+
+> ---
+
+###  **Task 4: Check the TPM**
 Let’s confirm you have a working **Trusted Platform Module (TPM):**
 ```bash
 ls /dev/tpm*
@@ -153,17 +157,17 @@ If your system has a TPM, you should see output similar to:
 crw-rw---- 1 tss  root  10,   224 Aug 22 13:05 /dev/tpm0
 crw-rw---- 1 root tss  253, 65536 Aug 22 13:05 /dev/tpmrm0
 ```
-> ⚠️ If you do not see these devices, it is *not* recommended to proceed. ⚠️
+> ⚠️ If you do not see these devices, you do not have a working TPM module. It is *not* recommended to proceed. ⚠️
 
----
+
 
 # SECTION 2: WIFI & NETWORKING
 
 NOTE: If your system already has an active Ethernet connection (discovered in "SYSTEM CHECKS" → "Detect network interfaces"), you can skip the WiFi and DHCP/Manual IP tasks.
 
----
+> ---
 
-### **Task 1: WiFi**
+###  **Task 1: WiFi**
 If you do not have an active Ethernet link, use iwd to configure WiFi:
 ```bash
 iwctl
@@ -175,7 +179,7 @@ You will see something like this:
 --------------------------------------------------------------------------------
   Name                  State            Scanning
 --------------------------------------------------------------------------------
-  wlan0                 disconnected     scanning  
+  wlan0                 disconnected  
 ```
 Your WiFi adapter is typically `wlan0`
 
@@ -190,14 +194,15 @@ You will get back a list, like this:
 --------------------------------------------------------------------------------
       Network name                      Security            Signal
 --------------------------------------------------------------------------------
+      YOUR-NETWORK-SSID                 psk                 ****    
       It-Burns-When-IP                  psk                 ****    
       ATTjBKEIbz                        psk                 ****    
-      this_one_Tod                      psk                 ****    
+      this_one_jake                     psk                 ****    
       BlueNose                          psk                 ****    
       OldPeople12345                    psk                 ****    
-      2deep                             psk                 ****    
+      in2deep2care                      psk                 ****    
 ```
-One of those should be your router/ap. Otherwise, it's outside the scope of this guide.
+One of those should be your router/ap. Otherwise, we're outside the scope of this guide. Have a look [at the wiki for useful information](https://wiki.archlinux.org/title/Network_configuration/Wireless#Troubleshooting). 
 
 Connect to *your* network:
 ```bash
@@ -205,10 +210,12 @@ station wlan0 connect YOUR-NETWORK-SSID
 exit
 ```
 
----
+> ---
 
-### **Task 2: DHCP/Manual IP**
-Most networks use DHCP, which Arch ISO's NetworkManager handles automatically. If your network does not provide DHCP, manually assign an IP address:
+###  **Task 2: DHCP/Manual IP**
+Most networks use DHCP, which Arch ISO's NetworkManager handles automatically. 
+
+If your network does not provide DHCP, manually assign an IP address:
 ```bash
 ip addr add 192.168.1.50/24 dev ens18
 ip link set ens18 up
@@ -219,9 +226,9 @@ Assumptions:
 - Default gateway at `192.168.1.1` (adjust for your network).  
 - Replace values with your network's configuration.
 
----
+> ---
 
-### **Task 3: Check Internet Connection**
+###  **Task 3: Check Internet Connection**
 Whether via Ethernet or WiFi, confirm Internet connectivity:
 ```bash
 ping -c 3 www.archlinux.org
@@ -232,9 +239,9 @@ ping -c 3 8.8.8.8
 ```
 Successful replies indicate you have a working Internet connection.
 
----
+> ---
 
-### **Task 4: Enable SSH access**
+###  **Task 4: Enable SSH access**
 Set a root password:
 ```bash
 passwd
@@ -254,16 +261,17 @@ ssh root@<installer-IP-address>
 
 Why enable SSH? Copy/pasting commands from this guide remotely is much easier than typing each command manually.
 
----
+
+
 
 # SECTION 3: PARTITIONS
 
 NOTE: The astute will notice some strangeness in my partitioning... There is method to my madness.
 We will be building a recovery partition, standing right next to the EFI partition. This recovery partition is not just for emergencies — it’s a second, bootable Arch installation. However, for the sake of security it too will get the full encryption treatment.
 
----
+> ---
 
-### **Task 1: Build the Partition Table**
+###  **Task 1: Build the Partition Table**
 Launch the partitioning tool:
 ```bash
 cfdisk /dev/sda
@@ -300,17 +308,17 @@ sda      8:0    0   256G  0 disk
 sr0     11:0    1   1.3G  0 rom  /run/archiso/bootmnt
 ```
 
----
+> ---
 
-### **Task 2: Encrypt All the things!**
+###  **Task 2: Encrypt All the things!**
 Encrypt the non-EFI partitions:
 ```bash
 cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda2
 cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda3
 ```
-NOTE: All options in the commands above are chosen to ensure compatibility with GRUB, SSDs, and strong encryption. Note: GRUB does not support LUKS2 yet, hence `--type luks1`, and it's very picky about iter-time and sector-size. Unless you know what you’re doing, just leave the command as-is.
+NOTES: All options in the commands above are chosen to ensure compatibility with GRUB, SSDs, and strong encryption. Note: GRUB does not support LUKS2 yet, hence `--type luks1`, and it's very picky about iter-time and sector-size. Unless you know what you’re doing, just leave the command as-is.
 
-Follow the prompts, but as a security note, this guide expects you to use a **STRONG** password. A weak password will negate any efforts we go through to secure your computer.
+Follow the prompts, but as a security note, this guide expects you to use a **STRONG** password. A weak password will negate any efforts we go through to secure your computer. You might be tempted to use the same password for both drives. This is not entirely discouraged. **However**, you need to be aware that if a hacker gets access to one password, they have access to both drives.
 
 What qualifies as a strong password? 
 - Here's a fast and humorous explanation: [XKCD webcomic # 936](https://xkcd.com/936/)
@@ -338,9 +346,9 @@ sda            8:0    0   256G  0 disk
 sr0           11:0    1   1.3G  0 rom   /run/archiso/bootmnt
 ```
 
----
+> ---
 
-### **Task 3: Swap Calculation**
+###  **Task 3: Swap Calculation**
 How much swap do you need?
 The old rule of thumb was 2.5× your RAM—back when 4 GB was considered “friken' *HUGE*.” Nowadays, 64 GB of RAM isn’t entirely unreasonable. As of this writing, most systems only need a couple of gigabytes of swap—unless you want **hibernation/resume**. In that case, you need roughly the same amount of swap space as your total RAM size, plus a little overhead.
 
@@ -351,15 +359,18 @@ awk '/MemTotal/ {ram=$2/1024; swap=(ram<2048?ram*2:(ram>65536?65536:ram+4096)); 
 This simply prints out a number. **Take note of it!**
 
 The logic behind this number:
-- If RAM < 2 GB → swap = 2× RAM (small systems need more swap)  
-- If RAM > 64 GB → swap capped at 64 GB (no need for enormous swap)  
-- Otherwise → swap = RAM + 4 GB (covers hibernation)
+- If RAM < 2 GB → swap = 2× RAM (small systems need more swap).
+- If RAM > 64 GB → swap capped at 64 GB (no need for enormous swap). 
+- Otherwise → swap = RAM + 4 GB (covers hibernation and typical system usage).
 
-If you have 64 GB or more of RAM… congratulations! You probably don’t even need swap for general use! However, If you **want** more swap with 64GB+ of RAM… ***why?***
+If you *do* have 64 GB or more of RAM… congratulations! You probably don’t even need swap for system use! However, If you **want** more swap with 64GB+ of RAM… **why?**
 
----
+Either way, make sure you take note of the number, you'll need it in a moment.
 
-### **Task 4: Setup LVMs**
+
+> ---
+
+###  **Task 4: Setup LVMs**
 We’re now going to carve up cryptsys into logical volumes for root and swap.
 
 Initialize the encrypted volume for LVM:
@@ -403,9 +414,9 @@ sda              8:0    0   256G  0 disk
 sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt
 ```
 
----
+> ---
 
-### **Task 5: Format Partitions**
+###  **Task 5: Format Partitions**
 Format EFI (Fat32):
 ```bash
 mkfs.fat -F32 /dev/sda1
@@ -423,9 +434,9 @@ Format lvm-swap (swap):
 mkswap /dev/mapper/lvm-swap
 ```
 
----
+> ---
 
-### **Task 6: Setup btrfs on root**
+###  **Task 6: Setup btrfs on root**
 Temporarily mount lvm-root to create subvols:
 ```bash
 mount /dev/mapper/lvm-root /mnt
@@ -458,9 +469,9 @@ umount /mnt
 ```
 > ⚠️ THIS IS NECESSARY! Do not skip! ⚠️
 
----
+> ---
 
-### **Task 7: Prepare the build space**
+###  **Task 7: Prepare the build space**
 Mount @ (compressed):
 ```bash
 mount -o ssd,noatime,compress=zstd:3,space_cache=v2,discard=async,subvol=@ /dev/mapper/lvm-root /mnt
@@ -479,13 +490,13 @@ mount -o ssd,noatime,compress=zstd:3,space_cache=v2,discard=async,subvol=@home /
 ```
 Mount @varlog (no compression; keep CoW/checksums):
 ```bash
-mount -o ssd,noatime,nocompress,space_cache=v2,discard=async,subvol=@varlog /dev/mapper/lvm-root /mnt/var/log
+mount -o ssd,noatime,compress=no,space_cache=v2,discard=async,subvol=@varlog /dev/mapper/lvm-root /mnt/var/log
 ```
 Mount @varcache/@vartmp/@varlibpacman (no CoW, no compression):
 ```bash
-mount -o ssd,noatime,nodatacow,nocompress,space_cache=v2,discard=async,subvol=@varcache /dev/mapper/lvm-root /mnt/var/cache
-mount -o ssd,noatime,nodatacow,nocompress,space_cache=v2,discard=async,subvol=@vartmp /dev/mapper/lvm-root /mnt/var/tmp
-mount -o ssd,noatime,nodatacow,nocompress,space_cache=v2,discard=async,subvol=@varlibpacman /dev/mapper/lvm-root /mnt/var/lib/pacman
+mount -o ssd,noatime,nodatacow,compress=no,space_cache=v2,discard=async,subvol=@varcache /dev/mapper/lvm-root /mnt/var/cache
+mount -o ssd,noatime,nodatacow,compress=no,space_cache=v2,discard=async,subvol=@vartmp /dev/mapper/lvm-root /mnt/var/tmp
+mount -o ssd,noatime,nodatacow,compress=no,space_cache=v2,discard=async,subvol=@varlibpacman /dev/mapper/lvm-root /mnt/var/lib/pacman
 ```
 Make NOCOW persistent for new files in these subvolumes (Optional):
 ```bash
@@ -495,7 +506,7 @@ chattr -R +C /mnt/var/lib/pacman
 ```
 Mount recovery (quiet, fewer writes; safe journaling):
 ```bash
-mount -o noatime,discard=async,data=ordered,commit=120 /dev/mapper/cryptrec /mnt/recovery
+mount -o noatime,discard,data=ordered,commit=120 /dev/mapper/cryptrec /mnt/recovery
 ```
 Enable swap
 ```bash
@@ -515,25 +526,75 @@ sda              8:0    0   256G  0 disk
 │ └─cryptrec   253:0    0    12G  0 crypt /mnt/recovery
 └─sda3           8:3    0 243.5G  0 part  
   └─cryptsys   253:1    0 243.5G  0 crypt 
-    ├─lvm-root 253:2    0 234.7G  0 lvm   /mnt
+    ├─lvm-root 253:2    0 234.7G  0 lvm   /mnt/var/lib/pacman
+    │                                     /mnt/var/tmp
+    │                                     /mnt/var/cache
+    │                                     /mnt/var/log
+    │                                     /mnt/home
+    │                                     /mnt
     └─lvm-swap 253:3    0   7.8G  0 lvm   [SWAP]
 sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt
 ```
 
-The build space is partitioned, encrypted, formatted, and mounted.
-You are ready to install the base system!
+> NOTE: the order of the btrfs subpartitions does **not** matter here. As long as they are mounted, we're fine. **however**, the order *does* matter (slightly) in fstab, which we will check on later.
 
 ---
+
+The build space is partitioned, encrypted, formatted, and mounted.
+You are ready to install the base system!
 
 # SECTION 4: INSTALL & CONFIGURATION
 
 ---
 
-### **Task 1: Install the base packages**
-Refresh pacman/repos (may not be necessary):
+###  **Task 1: Install the base packages**
+NOTE: the next section (rebuilding pacman's config and mirrorlist) is entirely unnecessary. I can see a single use case where these instructions would be useful, but you've got to have done something truly unwise to get here (like attempting to install arch from a manjaro install disk... Yeah... I've done it... **don't be like me**). Unless you're in such a situation, just move on to "Install base packages into /mnt":
+
+Reload Pacman's config file:
 ```bash
-pacman -Syy
+curl -o /etc/pacman.conf https://gitlab.archlinux.org/pacman/pacman/-/raw/master/etc/pacman.conf.in
 ```
+Edit the new config file:
+```bash
+nano /etc/pacman.conf
+```
+Add the `[core]` and `[extra]` stansas (**only** [core] and [extra] are required here):
+```text
+[core]
+Include = /etc/pacman.d/mirrorlist
+
+[extra]
+Include = /etc/pacman.d/mirrorlist
+```
+Download a fresh mirrorlist:
+```bash
+curl -o /etc/pacman.d/mirrorlist https://archlinux.org/mirrorlist/all/
+```
+Alternatively, for just US (switch for your country here):
+```bash
+curl -o /etc/pacman.d/mirrorlist "https://archlinux.org/mirrorlist/?country=US&protocol=https&use_mirror_status=on"
+```
+Uncomment all `Server` lines:
+```bash
+sed -i 's/^#Server/Server/' /etc/pacman.d/mirrorlist
+```
+Force refresh the keyring (important if switching to Arch):
+```bash
+sudo pacman -Sy archlinux-keyring
+```
+Rank mirrors for speed (optional):
+```bash
+pacman -Sy pacman-contrib
+rankmirrors -n 10 /etc/pacman.d/mirrorlist > /etc/pacman.d/mirrorlist.new
+mv /etc/pacman.d/mirrorlist.new /etc/pacman.d/mirrorlist
+```
+Sync pacman:
+```bash
+pacman -Syyu
+```
+
+---
+
 Install base packages into /mnt:
 ```bash
 pacstrap -i /mnt base linux linux-firmware nano grub efibootmgr
@@ -542,35 +603,81 @@ NOTES:
 - When prompted, install iptables-nft (2)
 - When prompted, install mkinitcpio (1)
 
+
 ---
 
-### **Task 2: Run pre-chroot configuration**
+###  **Task 2: Run pre-chroot configuration**
 Generate fstab:
 ```bash
 genfstab -U /mnt >> /mnt/etc/fstab
 ```
 
-Get UUID of the luks container and add it to the grub config file (**THIS MUST BE DONE OUTSIDE CHROOT**):
+Get UUID of the luks container and add it to the bottom of the grub config file (**THIS MUST BE DONE OUTSIDE CHROOT**):
 ```bash
-cryptsetup luksUUID /dev/sda3 >> /mnt/etc/default/grub`
+cryptsetup luksUUID /dev/sda3 >> /mnt/etc/default/grub
 ```
-NOTE: We capture the luksUUID here to simplify editing GRUB later inside the chroot. It will be used for GRUB_CMDLINE_LINUX’s cryptdevice parameter.
+NOTE: We capture the luksUUID here to simplify editing GRUB later inside the chroot. It will be used for GRUB_CMDLINE_LINUX’s cryptdevice parameter. Aquiring this UUID later may add complications. It's best to do it now, when theres no doubt the UUID is correct.
 
-Reminder: `/dev/sda3` is the main system (cryptsys). 
-We’ll capture `/dev/sda2` (recovery) later when we set up *its* GRUB.
+Reminder: `/dev/sda3` is the main system (cryptsys). We do NOT need to do this for /dev/sda2 **yet**. We’ll capture `/dev/sda2` (recovery) later, when we set up GRUB for recovery.
 
-Double check system config files:
+Check system config files:
 ```bash
-cat /mnt/etc/fstab
 cat /mnt/etc/pacman.d/mirrorlist
 cat /mnt/etc/default/grub
 cat /mnt/etc/mkinitcpio.conf
+cat /mnt/etc/fstab
 ```
-Note: you're mostly making sure they're where they belong.
+Note: you're mostly making sure they're where they belong. If the files are empty, or missing, you need to go back and see where they got missed (likely you need to re-run pacstrap and/or check where you set pacstrap to install)
+
+IMPORTANT!
+The output of `cat /mnt/etc/fstab` will look similar to this:
+```text
+# Static information about the filesystems.
+# See fstab(5) for details.
+
+# <file system> <dir> <type> <options> <dump> <pass>
+# /dev/mapper/lvm-root LABEL=root
+UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/         	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@	0 0
+
+# /dev/sda1
+UUID=1FA2-8FFE      	/boot/efi 	vfat      	rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2
+
+# /dev/mapper/lvm-root LABEL=root
+UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/home     	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@home	0 0
+
+# /dev/mapper/lvm-root LABEL=root
+UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/var/log  	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@varlog	0 0
+
+# /dev/mapper/lvm-root LABEL=root
+UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/var/cache	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@varcache	0 0
+
+# /dev/mapper/lvm-root LABEL=root
+UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/var/tmp  	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@vartmp	0 0
+
+# /dev/mapper/lvm-root LABEL=root
+UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/var/lib/pacman	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@varlibpacman	0 0
+
+# /dev/mapper/cryptrec LABEL=recovery
+UUID=638b612a-565f-4407-8200-8a8ce54023ae	/recovery 	ext4      	rw,noatime,commit=120,data=ordered	0 2
+
+# /dev/mapper/lvm-swap
+UUID=6228d775-db82-444b-b330-59e5cc1f2f30	none      	swap      	defaults  	0 0
+```
+NOTE: Please make note of `# /dev/mapper/lvm-root LABEL=root` It *should* already be at the top, but in roughly 25% of my test installs, it ends up on the bottom. Historically the order of mounts in `fstab` have not mattered, but for *some unknown reason*, in *this* build, it has mattered! When issues arise, boot halts because the kernel claims it can't find lvm-root. Moving the mountpoint to the top, resolved it every time.
+
+If you want to make changes to `fstab`, do it now:
+```bash
+nano /mnt/etc/fstab
+```
+
+> I find it best to move the cursor to the line you want to move, use CTRL-K to cut the line, then reposition to where you want to paste it, and use CTRL-U. Rinse and repeat for each line. 
+
+When you're done save and exit nano:
+> CTRL+X >> "y" >> [ENTER]
 
 ---
 
-### **Task 3: chroot into the build area**
+###  **Task 3: chroot into the build area**
 ```bash
 arch-chroot /mnt /bin/bash
 ```
@@ -579,7 +686,7 @@ You are now inside your new system. All following commands affect the installed 
 
 ---
 
-### **Task 4: Install needed tools**
+###  **Task 4: Install needed tools**
 Refresh the repositories.
 ```bash
 pacman -Syy
@@ -591,7 +698,7 @@ pacman -S reflector git rsync clevis luksmeta tpm2-tools lvm2 cryptsetup iwd net
 
 ---
 
-### **Task 5: Enable Services**
+###  **Task 5: Enable Services**
 ```bash
 systemctl enable sshd.service
 systemctl enable NetworkManager.service
@@ -599,7 +706,7 @@ systemctl enable NetworkManager.service
 
 ---
 
-### **Task 6: Configure Date, Time, and Location**
+###  **Task 6: Configure Date, Time, and Location**
 Set the region info:
 ```bash
 ln -sf /usr/share/zoneinfo/America/Boise /etc/localtime
@@ -615,9 +722,12 @@ Set the system time to ntp:
 timedatectl set-ntp true
 ```
 
-```note
-$$$NOTE TO SELF (or chatbot if I gave this to you): I would like an option to set the RTC time/date if it is not correct. I know I can use 'hwclock --systohc' to set the RTC from the systemclock, and I know `timedatectl set-ntp true` *should* set the system clock to the correct time... but I can see scenerios where neither are correct and for some reason ntp isn't working. so... how to set the system clock and update RTC?$$$
+If system time is wrong and for some reason NTP isn't working you can set it manually using:
+```bash
+timedatectl set-time "YYYY-MM-DD HH:MM:SS"
+hwclock --systohc
 ```
+> NOTE: replace "YYYY-MM-DD HH:MM:SS" with your *actual* time, ie: "2025-08-01 12:30:21"
 
 Generate Locale info:
 ```bash
@@ -630,11 +740,11 @@ NOTE: I'm in the US so I used "en_US.UTF-8". See [this wiki page](https://wiki.a
 
 ---
 
-### **Task 7: Set the computer name**
+###  **Task 7: Set the computer name**
 ```bash
-echo archlinux > /etc/hostname`
-echo 127.0.0.1	archlinux >> /etc/hosts`
-echo 127.0.1.1	archlinux.local.net	archlinux >> /etc/hosts`
+echo archlinux > /etc/hostname
+echo 127.0.0.1	archlinux >> /etc/hosts
+echo 127.0.1.1	archlinux.local.net	archlinux >> /etc/hosts
 ```
 NOTES:
 - Obviously replace "archlinux" with your preferred computer name.
@@ -642,29 +752,30 @@ NOTES:
 
 ---
 
-### **Task 8: Configure users**
+###  **Task 8: Configure users**
 Set the root password:
 ```bash
-`# passwd`
+passwd
 ```
 Configure sudo:
 ```bash
-`# EDITOR=nano visudo`
+EDITOR=nano visudo
 ```
 Look for and uncomment the following:
 ```text
-`%wheel      ALL=(ALL) ALL`
+%wheel      ALL=(ALL) ALL
 ```
 Configure your user:
 ```bash
-useradd -m -G lp,users,games,wheel -s /bin/bash $USERNAME
-passwd $USERNAME
+useradd -m -G lp,users,games,wheel -s /bin/bash archuser
+passwd archuser
 ```
-NOTE: Change "$USERNAME" to your preferred username.
+NOTE: Change "archuser" to your preferred username.
+
 
 ---
 
-### **Task 9: Setup clevis**
+###  **Task 9: Setup clevis**
 Clone the mkinitcpio-clevis-hook from git:
 ```bash
 cd /tmp
@@ -681,12 +792,13 @@ NOTES:
 
 ---
 
-### **Task 10: Edit mkinitcpio.conf**
+###  **Task 10: Edit mkinitcpio.conf**
 NOTE: there is a LOT going on here.
 - We are configuring zstd kernel compression
 - We are adding our primary hooks.
 - We are adding the clevis hook (to unlock cryptsys)
 - We are enabling kms and the associated modules (if applicable)
+- We are adding the keyfile for the recovery partition.
 
 Open mkinitcpio.conf:
 ```bash
@@ -718,13 +830,15 @@ For KMS for nvidia/nouveau GPUs...
 >				
 >======================================================================`
 For proprietary nvidia driver users, early KMS is not supported. You’ll get modesetting later in the boot, but that's all nvidia will deign to give you.
-
-NOTE: For those installing on virtualbox, vmware, proxmox and other such hypervisors, the kms HOOK is **essential** for the initial boot stages, else you will get a black screen and no indicator of what's going on. Otherwise, the associated `MODULES` are unnecessary.
 	
 For more useful info on Kernel Mode Setting (KMS) See the [wiki page](https://wiki.archlinux.org/title/Kernel_mode_setting#Early_KMS_start)
 
 ---
 
+Add your keyfile to the `FILES` section:
+```text
+FILES=(/etc/cryptsetup-keys.d/recovery.key)
+```
 
 Next, modify HOOKS similar to this:
 ```text
@@ -734,6 +848,8 @@ NOTES:
 - I find it easiest to simply comment out the existing HOOKS line, then just paste in this line right below it.
 - Bear in mind, this is *MY* hooks section! You should definitly read [the wiki page](https://wiki.archlinux.org/title/Mkinitcpio#Common_hooks) on hooks.
 
+NOTE: For those installing on virtualbox, vmware, proxmox and other such hypervisors, the `kms` HOOK is **essential** for the initial boot stages, else you will get a black screen and no indicator of what's going on. Otherwise, the associated `MODULES` are unnecessary.
+
 
 Finally, for zstd compression, simply uncomment the following:
 ```bash
@@ -742,11 +858,12 @@ COMPRESSION="zstd"
 done!
 
 Save and exit nano:
-> CTRL+X >> CTRL+Y >> [ENTER]
+> CTRL+X >> "y" >> [ENTER]
+
 
 ---
 
-### **Task 11: Edit grub config**
+###  **Task 11: Edit grub config**
 ```bash
 nano /etc/default/grub
 ```
@@ -761,16 +878,15 @@ GRUB_ENABLE_CRYPTODISK=y
 NOTES:
 - The UUID should be at the bottom of the file. 
 - The UUID was added to the file earlier using `cryptsetup luksUUID /dev/sda3 >> /mnt/etc/default/grub`
-- I find it best to move the cursor to the bottom line, use CTRL-K to cut the line, then reposition to where you want to paste it, and use CTRL-U. 
-- You'll need to remove the carraige return it likes to add after the UUID pastes in.
-- Make sure you delete the UUID from the bottom of the file if you don't use CTRL+K. Leaving it will cause errors!
+- If you use the "CTRL+K" method, you'll need to remove the carraige return it likes to add after the UUID pastes in.
+- If you *don't* use CTRL+K, and type/paste it in manually, make sure you delete the UUID from the bottom of the file. Leaving it will cause errors!
 
 Save and exit nano:
-> CTRL+X >> CTRL+Y >> [ENTER]
+> CTRL+X >> "y" >> [ENTER]
 
 ---
 
-### **Task 12: Install ucode for KMS**
+###  **Task 12: Install ucode for KMS**
 For AMD/Radeon graphics cards and iGPUs:
 ```bash
 pacman -S amd-ucode
@@ -785,22 +901,24 @@ NOTES:
 
 ---
 
-### **Task 13: Build/Install initramfs and grub**
-Build the kernel image:
-```bash
-mkinitcpio -P linux
-```
+###  **Task 13: Build/Install initramfs and grub**
+
 NOTES:
 - It **should not** be necessary to build the kernel image if you installed a ucode package. A hook triggers mkinitcpio during package installation, so the initramfs should already be generated.
 - If errors occured during the afformentioned mkinitrd (and you've already corrected them), or if you skipped ucode installation, then run this before continuing.
 
-Install the boot loader:
+Build the kernel image:
 ```bash
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ARCH
-grub-mkconfig -o /boot/grub/grub.cfg
+mkinitcpio -P linux
 ```
 
 ---
+
+Install the boot loader:
+```bash
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ARCHLINUX
+grub-mkconfig -o /boot/grub/grub.cfg
+```
 
 ### **Task 14: Configure crypttab**
 
@@ -824,9 +942,9 @@ cryptsetup luksAddKey /dev/sda2 /etc/cryptsetup-keys.d/recovery.key
 Now lets update crypttab to unlock the drive automatically:
 ```bash
 UUID=$(cryptsetup luksUUID /dev/sda2)
-echo "cryptrec $UUID /etc/cryptsetup-keys.d/recovery.key luks" >> /etc/crypttab
+echo "cryptrec	UUID=$UUID	/etc/cryptsetup-keys.d/recovery.key luks" >> /etc/crypttab
+sudo ln -s /etc/cryptsetup-keys.d/recovery.key /etc/cryptsetup-keys.d/$UUID.key
 ```
-
 NOTE: we will *only* do this for recovery. we NEVER want to store keys for the main OS in the open. Even if encrypted, the main drive can be scraped and keys aquired by maliscious individuals.
 
 ---
@@ -839,33 +957,106 @@ You *could* exit chroot, unmount the partitions, and continue on to the recovery
 > If you opt to skip SECTION 5 and 6, you *absolutely* need to continue to section 7! The recovery build is NOT optional and clevis and the TPM seal is only half installed at this point!
 ---
 
----
-
 # SECTION 5: INSTALL ALL THE THINGS!!!
 
-I will divide this section into options: GNOME, KDE Plasma, XFCE, Cinnamon, and LXQt.
+NOTE: I personally use Cinnamon and lightdm for my setup. As this is primarily a guide for myself, that's where I'm going to focus. However, I will toss in some quick and dirty steps for installing GNOME, KDE Plasma, XFCE, and LXQt. These are NOT to be considered comprehensive, nor complete. For a more thourough guide for any of these environments, I recommend [reading the wiki](https://wiki.archlinux.org/title/Desktop_environment).
 
 ---
 
-## **Option 1: GNOME Desktop**
-
-This option installs the **GNOME desktop environment** with the **GDM login manager**, plus a standard suite of applications and utilities to provide a complete desktop experience.  
+## **Cinnamon Desktop**
 
 ---
 
-###  Step 1: Install GNOME and GDM
+###  Step 1: Install Cinnamon and LightDM
 ```bash
-pacman -S gnome gdm
+pacman -S cinnamon lightdm lightdm-slick-greeter gnome-calculator gnome-terminal gedit vlc vlc-plugins-all celluloid cups system-config-printer networkmanager network-manager-applet blueman pavucontrol flameshot libreoffice-still hunspell-en_us hyphen-en evince code geany firefox chromium thunderbird transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted timeshift
+```
+NOTES: 
+- When pacman asks; use pipewire-jack (2) unless you intend to use pro audo tools... which I am not.
+- I use `libreoffice-still`... if you like a more "bleeding edge" you can use `libreoffice-fresh` instead.
+
+---
+
+Configure **automatic login** (Optional):
+Setup the autologin group and add your user:
+```bash
+groupadd -r autologin 2>/dev/null || true
+gpasswd -a archuser autologin
+```
+Reminder: change "archuser" to your username!
+
+Edit lightdm.conf:
+```bash
+nano /etc/lightdm/lightdm.conf
+```
+Uncomment and edit:
+```text
+[Seat:*]
+autologin-user=your_username
+autologin-session=cinnamon
+```
+Save and exit:
+> CTRL+X > "y" > ENTER
+
+---
+
+Enable services:
+```bash
+systemctl enable cups.service
+systemctl enable NetworkManager.service
+systemctl enable lightdm.service
+```
+
+Enable Flameshot autostart:
+```bash
+mkdir -p ~/.config/autostart
+cp /usr/share/applications/org.flameshot.Flameshot.desktop ~/.config/autostart/
+nano ~/.config/autostart/org.flameshot.Flameshot.desktop
+```
+Modify this:
+```text
+Exec=flameshot --background
 ```
 
 ---
 
-###  Step 2: Enable and Start GDM
+Fun and games!
+
+Install Vulkan support:
+- For AMD graphics:
 ```bash
-systemctl enable gdm.service
+pacman -S vulkan-intel
+```
+- For Intel graphics:
+```bash
+pacman -S amdvlk vulkan-radeon
+```
+- For nvidia graphics (proprietary):
+```bash
+pacman -S nvidia-utils
+```
+- For nvidia graphics (nouveau):
+```bash
+pacman -S vulkan-nouveau
+```
+Please note: I'm not bothering with 32bit libraries and therefor steam will not be installable. They're being slowly phased out and this guide is long enough. If you care about 32bit support or steam, have a look at [the wiki](https://wiki.archlinux.org/title/Vulkan). You will need to enable [multilib] in `/etc/pacman.conf` as well.
+
+Install some games:
+```bash
+pacman -S lutris
+```
+Yeah... I don't play a lot of games anymore. :/
+
+---
+
+## **GNOME Desktop**
+
+Install packages:
+```bash
+pacman -S gnome gdm gnome-calculator gnome-terminal gedit vlc rhythmbox cups system-config-printer networkmanager network-manager-applet blueman pavucontrol flameshot libreoffice-fresh hunspell-en_us hyphen-en evince code firefox thunderbird chromium transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted timeshift
 ```
 
-Optional: Configure **automatic login** by editing:
+Configure **automatic login** (Optional):
 ```bash
 /etc/gdm/custom.conf
 ```
@@ -876,74 +1067,21 @@ AutomaticLoginEnable=True
 AutomaticLogin=your_username
 ```
 
----
-
-###  Step 3: Install Common Utilities
-These applications provide the typical desktop tools you’d expect on any modern distribution.  
-
+Enable Services:
 ```bash
-pacman -S gnome-calculator gedit \
-    vlc rhythmbox \
-    cups system-config-printer \
-    networkmanager network-manager-applet \
-    blueman \
-    pavucontrol \
-    flameshot
-```
-
-Enable printing and NetworkManager:
-```bash
-systemctl enable cups.service
-systemctl enable NetworkManager.service
+systemctl enable gdm cups NetworkManager
 ```
 
 ---
 
-###  Step 4: Office / Productivity Suite (Optional)
+## **KDE Plasma Desktop**
+
+Install packages:
 ```bash
-pacman -S libreoffice-fresh \
-    hunspell-en_us hyphen-en \
-    evince
+pacman -S plasma sddm konsole kcalc kate vlc elisa cups system-config-printer networkmanager plasma-nm bluedevil pavucontrol spectacle libreoffice-fresh hunspell-en_us hyphen-en okular firefox chromium thunderbird ktorrent gvfs gvfs-smb nfs-utils cifs-utils sshfs partitionmanager timeshift
 ```
 
----
-
-###  Step 5: Internet Suite (Optional)
-```bash
-pacman -S firefox thunderbird \
-    chromium \
-    transmission-gtk
-```
-
----
-
-###  Step 6: Admin / Tools Suite
-```bash
-pacman -S gvfs gvfs-smb nfs-utils cifs-utils sshfs \
-    gparted \
-    timeshift
-```
-
----
-
-## **Option 2: KDE Plasma Desktop**
-
-This option installs the **KDE Plasma desktop environment** with the **SDDM login manager**, plus a standard suite of applications and utilities to provide a complete desktop experience.
-
----
-
-###  Step 1: Install KDE Plasma and SDDM
-```bash
-pacman -S plasma sddm
-
----
-
-###  Step 2: Enable and Start SDDM
-```bash
-systemctl enable sddm.service
-```
-
-Optional: Configure **automatic login** by editing:
+Configure **automatic login** (Optional):
 ```bash
 /etc/sddm.conf
 ```
@@ -958,67 +1096,21 @@ User=your_username
 Session=plasma.desktop
 ```
 
----
-
-###  Step 3: Install Common Utilities
-These applications provide the typical desktop tools you’d expect on any modern distribution.  
-
+Enable Services:
 ```bash
-pacman -S kcalc kate vlc elisa \
-    cups system-config-printer \
-    networkmanager plasma-nm \
-    bluedevil pavucontrol spectacle
-```
-
-Enable printing and NetworkManager:
-```bash
-systemctl enable cups.service
-systemctl enable NetworkManager.service
+systemctl enable sddm cups NetworkManager
 ```
 
 ---
 
-###  Step 4: Office / Productivity Suite (Optional)
+## **XFCE Desktop**
+
+Install packages:
 ```bash
-pacman -S libreoffice-fresh hunspell-en_us hyphen-en okular
+pacman -S xfce4 xfce4-goodies lightdm lightdm-gtk-greeter galculator mousepad vlc parole cups system-config-printer networkmanager network-manager-applet blueman pavucontrol xfce4-screenshooter libreoffice-fresh hunspell-en_us hyphen-en evince firefox chromium thunderbird transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted timeshift
 ```
 
----
-
-###  Step 5: Internet Suite (Optional)
-```bash
-pacman -S firefox chromium thunderbird ktorrent
-```
-
----
-
-###  Step 6: Admin / Tools Suite
-```bash
-pacman -S gvfs gvfs-smb nfs-utils cifs-utils sshfs \
-    partitionmanager timeshift
-```
-
----
-
-## **Option 3: XFCE Desktop**
-
-This option installs the **XFCE desktop environment** with the **LightDM login manager**, plus a standard suite of applications and utilities to provide a complete desktop experience.
-
----
-
-###  Step 1: Install XFCE and LightDM
-```bash
-pacman -S xfce4 xfce4-goodies lightdm lightdm-gtk-greeter
-```
-
----
-
-###  Step 2: Enable LightDM
-```bash
-systemctl enable lightdm.service
-```
-
-Optional: Configure **automatic login** by editing:
+Configure **automatic login** (Optional):
 ```bash
 /etc/lightdm/lightdm.conf
 ```
@@ -1029,111 +1121,9 @@ autologin-user=your_username
 autologin-session=xfce
 ```
 
----
-
-###  Step 3: Install Common Utilities
+Enable Services:
 ```bash
-pacman -S galculator mousepad vlc parole \
-    cups system-config-printer \
-    networkmanager network-manager-applet \
-    blueman pavucontrol xfce4-screenshooter
-```
-
-Enable printing and networking:
-```bash
-systemctl enable cups.service
-systemctl enable NetworkManager.service
-```
-
----
-
-###  Step 4: Office / Productivity Suite (Optional)
-```bash
-pacman -S libreoffice-fresh hunspell-en_us hyphen-en evince
-```
-
----
-
-###  Step 5: Internet Suite (Optional)
-```bash
-pacman -S firefox chromium thunderbird transmission-gtk
-```
-
----
-
-###  Step 6: Admin / Tools Suite
-```bash
-pacman -S gvfs gvfs-smb nfs-utils cifs-utils sshfs \
-    gparted timeshift
-```
-
----
-
-## **Option 4: Cinnamon Desktop**
-
-This option installs the **Cinnamon desktop environment** with the **LightDM login manager**, plus a standard suite of applications and utilities to provide a complete desktop experience.
-
----
-
-###  Step 1: Install Cinnamon and LightDM
-```bash
-pacman -S cinnamon lightdm lightdm-slick-greeter
-```
-
----
-
-###  Step 2: Enable LightDM
-```bash
-systemctl enable lightdm.service
-```
-
-Optional: Configure **automatic login** by editing:
-```bash
-/etc/lightdm/lightdm.conf
-```
-Uncomment and edit:
-```ini
-[Seat:*]
-autologin-user=your_username
-autologin-session=cinnamon
-```
-
----
-
-###  Step 3: Install Common Utilities
-```bash
-pacman -S gnome-calculator gedit vlc celluloid \
-    cups system-config-printer \
-    networkmanager network-manager-applet \
-    blueman pavucontrol gnome-screenshot
-```
-
-Enable printing and networking:
-```bash
-systemctl enable cups.service
-systemctl enable NetworkManager.service
-```
-
----
-
-###  Step 4: Office / Productivity Suite (Optional)
-```bash
-pacman -S libreoffice-fresh hunspell-en_us hyphen-en evince
-```
-
----
-
-###  Step 5: Internet Suite (Optional)
-```bash
-pacman -S firefox chromium thunderbird transmission-gtk
-```
-
----
-
-###  Step 6: Admin / Tools Suite
-```bash
-pacman -S gvfs gvfs-smb nfs-utils cifs-utils sshfs \
-    gparted timeshift
+systemctl enable lightdm cups NetworkManager
 ```
 
 ---
@@ -1142,18 +1132,13 @@ pacman -S gvfs gvfs-smb nfs-utils cifs-utils sshfs \
 
 This option installs the **LXQt desktop environment** with the **SDDM login manager**, plus a standard suite of applications and utilities. LXQt is a lightweight alternative ideal for older or low-resource machines, but still user-friendly.
 
----
-
-###  Step 1: Install LXQt and SDDM
-```bash
-pacman -S lxqt sddm
-```
+NOTE: I do not typically use this DE and WM. This section is basic, at best. Feedback is welcome, but YMMV.
 
 ---
 
-###  Step 2: Enable SDDM
+Install packages:
 ```bash
-systemctl enable sddm.service
+pacman -S lxqt sddm gnome-calculator featherpad vlc celluloid cups system-config-printer networkmanager network-manager-applet blueman pavucontrol lximage-qt libreoffice-fresh hunspell-en_us hyphen-en okular firefox chromium thunderbird transmission-qt gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted timeshift
 ```
 
 Optional: Configure **automatic login** by editing:
@@ -1167,43 +1152,9 @@ User=your_username
 Session=lxqt
 ```
 
----
-
-###  Step 3: Install Common Utilities
-LXQt doesn’t include much by default, so we’ll add the basics:
+Enable Services:
 ```bash
-pacman -S gnome-calculator featherpad vlc celluloid \
-    cups system-config-printer \
-    networkmanager network-manager-applet \
-    blueman pavucontrol lximage-qt
-```
-
-Enable printing and networking:
-```bash
-systemctl enable cups.service
-systemctl enable NetworkManager.service
-```
-
----
-
-###  Step 4: Office / Productivity Suite (Optional)
-```bash
-pacman -S libreoffice-fresh hunspell-en_us hyphen-en okular
-```
-
----
-
-###  Step 5: Internet Suite (Optional)
-```bash
-pacman -S firefox chromium thunderbird transmission-qt
-```
-
----
-
-###  Step 6: Admin / Tools Suite
-```bash
-pacman -S gvfs gvfs-smb nfs-utils cifs-utils sshfs \
-    gparted timeshift
+systemctl enable cups sddm NetworkManager
 ```
 
 ---
@@ -1216,17 +1167,17 @@ Me, personally? I like the wall of text. Makes me feel like a hackerman! But tha
 
 ---
 
-### **Step 1: Install Plymouth**
+###  **Step 1: Install Plymouth**
 ```bash
 pacman -S plymouth
 ```
 
 ---
 
-### **Step 2: Add Plymouth to initramfs**
-Edit:
+###  **Step 2: Add Plymouth to initramfs**
+Edit mkinitcpio.conf:
 ```bash
-/etc/mkinitcpio.conf
+nano /etc/mkinitcpio.conf
 ```
 
 In the `HOOKS=` line, add **`plymouth`** *after* `base` and `udev`, but **before** `encrypt`:
@@ -1234,17 +1185,12 @@ In the `HOOKS=` line, add **`plymouth`** *after* `base` and `udev`, but **before
 HOOKS=(base udev plymouth autodetect microcode modconf kms keyboard keymap block clevis encrypt lvm2 filesystems resume)
 ```
 
-Rebuild the initramfs:
-```bash
-mkinitcpio -P
-```
-
 ---
 
-### **Step 3: Configure GRUB for Plymouth**
-Edit:
+###  **Step 3: Configure GRUB for Plymouth**
+Edit grub config:
 ```bash
-/etc/default/grub
+nano /etc/default/grub
 ```
 
 Find the `GRUB_CMDLINE_LINUX_DEFAULT=` line and add:
@@ -1264,16 +1210,7 @@ grub-mkconfig -o /boot/grub/grub.cfg
 
 ---
 
-### **Step 4: Enable Plymouth Service (for shutdown/reboot splash)**
-```bash
-systemctl enable plymouth-quit.service
-systemctl enable plymouth-quit-wait.service
-systemctl enable plymouth-start.service
-```
-
----
-
-### **Step 5: Choose a Theme**
+###  **Step 5: Choose a Theme**
 List available themes:
 ```bash
 plymouth-set-default-theme -l
@@ -1284,20 +1221,20 @@ Pick one (e.g. *bgrt*, *spinner*, *solar*, *fade-in*, *tribar*):
 plymouth-set-default-theme spinner
 ```
 
-Rebuild initramfs after changing theme:
+Rebuild initramfs (must be done after changing theme):
 ```bash
-mkinitcpio -P
+mkinitcpio -P linux
 ```
-
-Now your system boots up with a smooth graphical splash!
 
 ---
 
 # SECTION 7: RECOVERY
 
+This section is where we will build the recovery partition. Full disclosure: recovery isn't strictly necessary, but in the even your have a boot failure and the SSD is still alive, you'll be glad you have it!
+
 ---
 
-### **Task 0: Prepare the recovery build space**
+###  **Task 0: Prepare the recovery build space**
 
 Exit chroot and unmount the arch build space:
 ```bash
@@ -1307,7 +1244,7 @@ swapoff /dev/mapper/lvm-swap
 ```
 Mount recovery partition:
 ```bash
-mount /dev/mapper/recovery /mnt
+mount /dev/mapper/cryptrec /mnt
 ```
 Create EFI mount point:
 ```bash
@@ -1339,20 +1276,19 @@ sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt
 ---
 
 NOTES:
-- We need to effectively repeat everything we did in Section 4. It's a very tedious process so I'm going to just blitz through it. I'm not even going to stop for sanity checks. If you need a full explanation, you can go back to section 4 and just repeat it exactly, here!
-- We will NOT be repeating SECTION 5 or 6. Though we will be installing some additional recovery tools.
+- We need to effectively repeat everything we did in Section 4. There are subtle differences so I'm not going to do the lazy "just go back and repeat". That said, it's a very tedious process so I'm going to just blitz through it.
+- We will **NOT** be repeating SECTION 5 or 6. Though we will be installing some additional recovery tools.
 
 ---
 
-### **Task 1: Install the base packages**
+###  **Task 1: Install the base packages**
 ```
-pacman -Syy
 pacstrap -i /mnt base linux linux-firmware nano grub efibootmgr
 ```
 
 ---
 
-### **Task 2: Run pre-chroot configuration**
+###   **Task 2: Run pre-chroot configuration**
 ```
 genfstab -U /mnt >> /mnt/etc/fstab
 cryptsetup luksUUID /dev/sda2 >> /mnt/etc/default/grub
@@ -1360,30 +1296,28 @@ cryptsetup luksUUID /dev/sda2 >> /mnt/etc/default/grub
 
 ---
 
-### **Task 3: chroot into the build area**
+###   **Task 3: chroot into the build area**
 ```
 arch-chroot /mnt /bin/bash
 ```
 
 ---
 
-### **Task 4: Install needed tools**
+###   **Task 4: Install needed tools**
 ```
-pacman -Syy
-pacman -S reflector git rsync clevis luksmeta tpm2-tools lvm2 cryptsetup iwd networkmanager openssh sudo
-```
-
----
-
-### **Task 5: Enable Services**
-```
-systemctl enable sshd.service
-systemctl enable NetworkManager.service
+pacman -Syy && pacman -S reflector git rsync clevis luksmeta tpm2-tools lvm2 cryptsetup iwd networkmanager openssh sudo
 ```
 
 ---
 
-### **Task 6: Configure Date, Time, and Location**
+###   **Task 5: Enable Services**
+```
+systemctl enable sshd NetworkManager
+```
+
+---
+
+###   **Task 6: Configure Date, Time, and Location**
 ```
 ln -sf /usr/share/zoneinfo/America/Boise /etc/localtime
 timedatectl set-ntp true
@@ -1396,7 +1330,7 @@ echo LC_MESSAGES=en_US.UTF-8 >> /etc/locale.conf
 
 ---
 
-### **Task 7: Set the computer name**
+###   **Task 7: Set the computer name**
 ```
 echo recovery > /etc/hostname
 echo 127.0.0.1	recovery >> /etc/hosts
@@ -1405,7 +1339,7 @@ echo 127.0.1.1	recovery.local.net	recovery >> /etc/hosts
 
 ---
 
-### **Task 8: Configure users**
+###   **Task 8: Configure users**
 ```
 passwd
 EDITOR=nano visudo
@@ -1416,14 +1350,14 @@ EDITOR=nano visudo
 ```
 
 ```
-useradd -m -G lp,users,games,wheel -s /bin/bash $USERNAME
-passwd $USERNAME
+useradd -m -G lp,users,games,wheel -s /bin/bash archrecovery
+passwd archrecovery
 ```
 > REMINDER: set your own username!
 
 ---
 
-### **Task 9: Setup clevis**
+###   **Task 9: Setup clevis**
 ```
 cd /tmp
 git clone https://github.com/kishorviswanathan/arch-mkinitcpio-clevis-hook.git
@@ -1433,7 +1367,7 @@ sh install.sh
 
 ---
 
-### **Task 10: Edit mkinitcpio.conf**
+###   **Task 10: Edit mkinitcpio.conf**
 ```
 nano /etc/mkinitcpio.conf
 ```
@@ -1448,20 +1382,20 @@ HOOKS=(base udev autodetect microcode modconf kms keyboard keymap block clevis e
 
 ---
 
-### **Task 11: Edit grub config**
+###   **Task 11: Edit grub config**
 ```
 nano /etc/default/grub
 ```
 - Set GRUB_CMDLINE_LINUX:  
 ```
-GRUB_CMDLINE_LINUX="cryptdevice=UUID=<luksUUID-of-/dev/sda2>:cryptsys resume=/dev/mapper/lvm-swap"
+GRUB_CMDLINE_LINUX="cryptdevice=UUID=<luksUUID-of-/dev/sda2>:cryptrec"
 ```
 - Set `GRUB_ENABLE_CRYPTODISK=y`
 > REMINDER: the UUID of /dev/sda2 will be at the bottom of the file. CTRL+K to cut. CTRL+U to paste.
 
 ---
 
-### **Task 12: Install ucode for KMS**
+###   **Task 12: Install ucode for KMS**
 ```
 pacman -S amd-ucode       # For AMD/Radeon GPUs
 pacman -S intel-ucode     # For Intel GPUs
@@ -1469,24 +1403,22 @@ pacman -S intel-ucode     # For Intel GPUs
 
 ---
 
-### **Task 13: Build/Install initramfs and grub**
+###   **Task 13: Build/Install initramfs and grub**
 ```
 mkinitcpio -P linux
-grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ARCH
+grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=RECOVERY
 grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
 ---
 
-WHEW! That was a lot, fast! hopefully you got it!
+WHEW! That was a lot, fast! hopefully you got it all!
 
 ---
 
 ### **Task 14: Install Recovery Tools**
 ```bash
-pacman -S btrfs-progs lvm2 dosfstools ntfs-3g gdisk gptfdisk e2fsprogs rsync parted \
-cryptsetup clevis luksmeta tpm2-tools networkmanager iwd openssh vim htop smartmontools \
-timeshift grub efibootmgr pacman arch-install-scripts
+pacman -S btrfs-progs lvm2 dosfstools ntfs-3g gdisk gptfdisk e2fsprogs rsync parted cryptsetup clevis luksmeta tpm2-tools networkmanager iwd openssh vim htop smartmontools timeshift grub efibootmgr pacman archinstall arch-install-scripts
 ```
 ⚠️ Note: Some of these tools may have been installed previously. This command ensures everything needed for recovery is present.
 
@@ -1505,11 +1437,7 @@ Once installed, the recovery system can:
 
 > These steps are only needed in absolute worst-case scenarios — covering situations where the main OS is completely unbootable.
 
----
-
 # SECTION 8: BOOTLOADERS AND YOU!
-
----
 
 ### **Task 1: Set the boot device in EFI firmware**
 
@@ -1526,19 +1454,19 @@ Boot0000* UiApp ...
 Boot0001* UEFI QEMU DVD-ROM QM00003 ...
 Boot0002* UEFI QEMU QEMU HARDDISK ...
 Boot0003* Windows Boot Manager ...
-Boot0004* ARCH ...
+Boot0004* ARCHLINUX ...
 Boot0005* RECOVERY ...
 
 ```
 Notes:
-- The entries for ARCH and RECOVERY were added in that order; currently RECOVERY is the top boot priority.
+- The entries for ARCHLINUX and RECOVERY were added in that order; currently RECOVERY is the top boot priority.
 - We need to change the boot order to load ARCH first, then RECOVERY, then everything else in their existing order.
 
 Change the EFI boot order:
 ```bash
 efibootmgr -o 0004,0005,0003,0002,0001,0000
 ```
-⚠️ Warning: Do not omit or skip any entries listed in the current BootOrder. Firmware can behave unpredictably if entries are missing.
+⚠️ Warning: Do not omit or skip any entries listed in the current `BootOrder`. Firmware can behave unpredictably if entries are missing.
 
 > Optional cleanup: It is safe to remove superfluous entries if desired. For example, to delete the Windows Boot Manager entry above:
 ```bash
@@ -1548,14 +1476,14 @@ efibootmgr -b 0003 -B
 
 Make these changes now before moving on, or ensure you are at peace with the current setup.
 
----
-
 ### **Task 2: Configure LUKS/TPM2 bind with Clevis**
 
 Bind the root partition to TPM2:
 ```bash
 clevis luks bind -d /dev/sda3 tpm2 '{"pcr_bank":"sha256","pcr_ids":"0,4,7"}'
 ```
+It will ask to initialize the drive. This is expected. Hit "y" > ENTER
+
 Notes:
 - pcr_bank specifies the hash algorithm; sha256 is recommended.
 - pcr_ids correspond to firmware and boot measurements:
@@ -1568,8 +1496,6 @@ Notes:
     - Certain firmware-specific boot path settings
   - PCR 7 usually remains stable, which is why we ensured the boot manager was correctly set before running this command.
 
----
-
 ### **Task 3: Unmount and reboot**
 ```bash
 exit
@@ -1578,14 +1504,34 @@ swapoff /dev/mapper/lvm-swap
 reboot
 ```
 
-Your Arch system is now fully installed, encrypted, and ready to boot. The recovery partition is also configured for future emergency use.
+Your Arch system is now fully installed, encrypted, and ready to boot. The recovery partition is also configured for emergency use.
+
+The recovery partition is NOT listed in the boot menu (which is why we disabled it). To load into the recovery partition, during boot, use your PCs boot functions to get into the UEFI boot device menu. This differes from manufacturer to manufacturer, but heres a table with the common methods:
+
+```text
+| Vendor (desktop/laptop) | Boot menu key                          | Setup (UEFI/BIOS) key |
+| ----------------------- | -------------------------------------- | --------------------- |
+| **ASUS**                | `F8`                                   | `Del` or `F2`         |
+| **Gigabyte / Aorus**    | `F12`                                  | `Del`                 |
+| **MSI**                 | `F11`                                  | `Del`                 |
+| **ASRock**              | `F11`                                  | `Del` or `F2`         |
+| **Dell**                | `F12`                                  | `F2`                  |
+| **HP**                  | `Esc` → `F9`                           | `Esc` or `F10`        |
+| **Lenovo (ThinkPad)**   | `F12`                                  | `Enter` → `F1`        |
+| **Lenovo (consumer)**   | `F12`                                  | `F2`                  |
+| **Acer**                | `F12` (enable in BIOS first sometimes) | `Del` or `F2`         |
+| **Toshiba**             | `F12`                                  | `F2`                  |
+| **Samsung**             | `Esc` or `F12`                         | `F2`                  |
+| **Sony VAIO**           | `F11` or `Assist` button               | `F2`                  |
+```
+
+Once in the boot device menu, you *should* see two familliar entries: ARCHLINUX and RECOVERY... these *should* be self explanitory, but RECOVERY will boot into your recovery partition. Doing this should be temporary, so on the next reboot your system will load into ARCHLINUX as we set previously with `efibootmgr`.
 
 ---
 
 # SECTION 9: BUTTON IT UP!
 
 This section configures a staged, user-mediated recovery update system. Recovery updates are applied only after at least one safe reboot of the main OS, and the user explicitly confirms applying the updates. Only packages that exist on the recovery partition are staged.
-Unlike the previous *entire guide* this section expects you to have booted successfully into your new and shiney arch for paranoid people. You should therefore open up a terminal, konsole, or just slip on over to console 2 (CTRL+ALT+F2). Log in as your regular user, and then run the following with sudo!
 
 ---
 
@@ -1593,8 +1539,8 @@ Unlike the previous *entire guide* this section expects you to have booted succe
 
 Create the directory to track recovery update state:
 ```bash
-sudo mkdir -p /var/cache/recovery-updates
-sudo touch /var/cache/recovery-updates/staged-packages.txt
+mkdir -p /var/cache/recovery-updates
+touch /var/cache/recovery-updates/staged-packages.txt
 ```
 State files:
 - /var/cache/recovery-updates/staged-packages.txt → Staged package list for recovery.
@@ -1607,18 +1553,19 @@ State files:
 
 This list defines which packages should ever be updated in recovery:
 ```bash
-sudo pacstrap -Qq /recovery > /etc/recovery-pkg-list
+pacstrap -Qq /recovery > /etc/recovery-pkg-list
 ```
 - Only the packages listed in `/etc/recovery-pkg-list` will be considered for staged updates.
+
+> $$$ NOTE TO SELF: maybe use `pacman -Qe --root /recovery | cut -d' ' -f1 > /etc/recovery-pkg-list` instead of `pacstrap -Qq /recovery > /etc/recovery-pkg-list`. The former will check for dependancies and not just the installed.
+
 
 ---
 
 ### **Task 3: Configure pacman hook to stage updates**
 
-Create `/etc/pacman.d/hooks/recovery-update.hook`:
-
-```bash
-sudo tee /etc/pacman.d/hooks/recovery-update.hook > /dev/null << EOF
+Create /etc/pacman.d/hooks/recovery-update.hook:
+```text
 [Trigger]
 Operation = Upgrade
 Type = Package
@@ -1628,16 +1575,12 @@ Target = *
 Description = Stage updates for recovery partition
 When = PostTransaction
 Exec = /usr/local/bin/stage-recovery-updates.sh
-EOF
 ```
-
----
 
 ### **Task 4: Create staging script**
 
-Create `/usr/local/bin/stage-recovery-updates.sh`:
-```bash
-sudo tee /usr/local/bin/stage-recovery-updates.sh > /dev/null << EOF
+Create /usr/local/bin/stage-recovery-updates.sh:
+```text
 #!/bin/bash
 
 STAGE_DIR="/var/cache/recovery-updates"
@@ -1664,20 +1607,15 @@ for pkg in "$@"; do
         grep -qx "$pkg" "$STAGED" || echo "$pkg" >> "$STAGED"
     fi
 done
-EOF
 ```
 
 Make it executable:
 ```bash
-sudo chmod +x /usr/local/bin/stage-recovery-updates.sh
+chmod +x /usr/local/bin/stage-recovery-updates.sh
 ```
 
----
-
 ### **Task 5: Mark successful reboot**
-Create a systemd one-shot service /etc/systemd/system/recovery-reboot-ok.service:
-```bash
-sudo tee /etc/systemd/system/recovery-reboot-ok.service > /dev/null << EOF
+```text
 [Unit]
 Description=Mark recovery updates safe to apply after reboot
 After=multi-user.target
@@ -1688,19 +1626,14 @@ ExecStart=/bin/touch /var/cache/recovery-updates/reboot-ok
 
 [Install]
 WantedBy=multi-user.target
-EOF
 ```
 Enable the service:
 ```bash
 systemctl enable recovery-reboot-ok.service
 ```
-
----
-
 ### **Task 6: Apply staged updates**
 Create `/usr/local/bin/apply-recovery-updates.sh`:
-```bash
-sudo tee /usr/local/bin/apply-recovery-updates.sh > /dev/null << EOF
+```text
 #!/bin/bash
 STAGE_DIR="/var/cache/recovery-updates"
 STAGED="$STAGE_DIR/staged-packages.txt"
@@ -1721,7 +1654,6 @@ fi
 
 umount $RECOVERY_MNT
 echo "Recovery partition updated successfully."
-EOF
 ```
 Make it executable:
 ```bash
@@ -1733,3 +1665,4 @@ Summary:
 - After at least one safe reboot: user is prompted to apply updates.
 - Only packages installed on recovery are staged and updated.
 - Updates do not pile on automatically — the user is informed and must confirm.
+
