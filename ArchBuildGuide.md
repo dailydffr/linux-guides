@@ -54,7 +54,7 @@ This double password prompt is a **red flag**. It doesn’t always mean your sys
 
 In maximum-paranoia terms: if an attacker somehow *had* access to your encrypted root (and therefore your initramfs), your system is already lost. The second prompt would still be a clue, but realistically you wouldn’t have the laptop back in that scenario unless the attacker wanted something they couldn’t get without tricking you.  
 
-Either way—benign update or hostile tampering—the second prompt deserves your full attention.  
+Either way—benign update or hostile tampering—anytime you see a second prompt for a password at boot time, deserves your full attention.  
 
 ---
 
@@ -73,10 +73,10 @@ ls -l /sys/firmware/efi/efivars
 Expected output (truncated):
 ```text
 total 0
--rw-r--r-- 1 root root   66 Aug 22 13:05 Boot0000-8be...
--rw-r--r-- 1 root root  112 Aug 22 13:05 Boot0002-8be...
--rw-r--r-- 1 root root   24 Aug 22 13:05 LoaderFirmwareType-4a6...
--rw-r--r-- 1 root root    5 Aug 22 13:05 SecureBoot-8be...
+-rw-r--r-- 1 root root   66 Aug 22 13:05 Boot0000-8be4df61-93ca-11d2-aa0d-00e098032b8c
+-rw-r--r-- 1 root root  112 Aug 22 13:05 Boot0002-8be4df61-93ca-11d2-aa0d-00e098032b8c
+-rw-r--r-- 1 root root   24 Aug 22 13:05 LoaderFirmwareType-8be4df61-93ca-11d2-aa0d-00e098032b8c
+-rw-r--r-- 1 root root    5 Aug 22 13:05 SecureBoot-8be4df61-93ca-11d2-aa0d-00e098032b8c
 ...
 ```
 
@@ -124,7 +124,7 @@ Example output:
     link/ether 22-f5-7b-d6-25-ea brd ff:ff:ff:ff:ff:ff
 ```
 Interpretation:  
-• `ens18` = Ethernet device (currently DOWN).  
+• `ens18` = Ethernet device (currently UP).  
 • `wlan0` = Wireless adapter (currently DOWN, to be configured later).  
 Take note of your actual device names!
 
@@ -457,11 +457,11 @@ btrfs subvolume list /mnt
 You should see something like this:
 ```text
 ID 256 gen 9 top level 5 path @
-ID 257 gen 10 top level 5 path @home
-ID 258 gen 10 top level 5 path @varlog
-ID 259 gen 10 top level 5 path @varcache
-ID 260 gen 11 top level 5 path @varlibpacman
-ID 261 gen 11 top level 5 path @vartmp
+ID 257 gen 9 top level 5 path @home
+ID 258 gen 9 top level 5 path @varlog
+ID 259 gen 9 top level 5 path @varcache
+ID 260 gen 9 top level 5 path @varlibpacman
+ID 261 gen 9 top level 5 path @vartmp
 ```
 Unmount `/dev/mapper/lvm-root`:
 ```bash
@@ -548,9 +548,13 @@ You are ready to install the base system!
 ---
 
 ###  **Task 1: Install the base packages**
-NOTE: the next section (rebuilding pacman's config and mirrorlist) is entirely unnecessary. I can see a single use case where these instructions would be useful, but you've got to have done something truly unwise to get here (like attempting to install arch from a manjaro install disk... Yeah... I've done it... **don't be like me**). Unless you're in such a situation, just move on to "Install base packages into /mnt":
 
-Reload Pacman's config file:
+NOTE: the next section (Rebuild pacman's config and mirrorlist) is entirely unnecessary. I can see a single use case where these instructions would be useful, but you've got to have done something truly unwise to get here (like attempting to install arch from a manjaro install disk... Yeah... Mistakes were made. **don't be like me**). Unless you're in such a situation, just move on to "Install base packages into /mnt":
+
+---
+
+Rebuild pacman's config and mirrorlist:
+Reload pacman's config file:
 ```bash
 curl -o /etc/pacman.conf https://gitlab.archlinux.org/pacman/pacman/-/raw/master/etc/pacman.conf.in
 ```
@@ -597,7 +601,7 @@ pacman -Syyu
 
 Install base packages into /mnt:
 ```bash
-pacstrap -i /mnt base linux linux-firmware nano grub efibootmgr
+pacstrap -i /mnt base linux linux-firmware base-devel nano nano-syntax-highlighting grub efibootmgr
 ```
 NOTES:
 - When prompted, install iptables-nft (2)
@@ -637,33 +641,34 @@ The output of `cat /mnt/etc/fstab` will look similar to this:
 
 # <file system> <dir> <type> <options> <dump> <pass>
 # /dev/mapper/lvm-root LABEL=root
-UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/         	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@	0 0
+UUID=4a40d049-b74f-4034-915a-a500f5404030	/         	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@	0 0
 
 # /dev/sda1
-UUID=1FA2-8FFE      	/boot/efi 	vfat      	rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2
+UUID=73DC-6BAC      	/boot/efi 	vfat      	rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2
 
 # /dev/mapper/lvm-root LABEL=root
-UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/home     	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@home	0 0
+UUID=4a40d049-b74f-4034-915a-a500f5404030	/home     	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@home	0 0
 
 # /dev/mapper/lvm-root LABEL=root
-UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/var/log  	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@varlog	0 0
+UUID=4a40d049-b74f-4034-915a-a500f5404030	/var/log  	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@varlog	0 0
 
 # /dev/mapper/lvm-root LABEL=root
-UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/var/cache	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@varcache	0 0
+UUID=4a40d049-b74f-4034-915a-a500f5404030	/var/cache	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@varcache	0 0
 
 # /dev/mapper/lvm-root LABEL=root
-UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/var/tmp  	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@vartmp	0 0
+UUID=4a40d049-b74f-4034-915a-a500f5404030	/var/tmp  	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@vartmp	0 0
 
 # /dev/mapper/lvm-root LABEL=root
-UUID=a0894bb5-d165-4e80-bbce-b2460609e4f6	/var/lib/pacman	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@varlibpacman	0 0
+UUID=4a40d049-b74f-4034-915a-a500f5404030	/var/lib/pacman	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@varlibpacman	0 0
 
 # /dev/mapper/cryptrec LABEL=recovery
-UUID=638b612a-565f-4407-8200-8a8ce54023ae	/recovery 	ext4      	rw,noatime,commit=120,data=ordered	0 2
+UUID=369de518-2a3d-4428-9a14-775345ac7e10	/recovery 	ext4      	rw,noatime,commit=120,data=ordered	0 2
 
 # /dev/mapper/lvm-swap
-UUID=6228d775-db82-444b-b330-59e5cc1f2f30	none      	swap      	defaults  	0 0
+UUID=ab1d9112-9d61-43e1-9f70-a935d08debb9	none      	swap      	defaults  	0 0
+
 ```
-NOTE: Please make note of `# /dev/mapper/lvm-root LABEL=root` It *should* already be at the top, but in roughly 25% of my test installs, it ends up on the bottom. Historically the order of mounts in `fstab` have not mattered, but for *some unknown reason*, in *this* build, it has mattered! When issues arise, boot halts because the kernel claims it can't find lvm-root. Moving the mountpoint to the top, resolved it every time.
+NOTE: Please make note of `# /dev/mapper/lvm-root LABEL=root` There are 6 of them... The one we care about right now is the entry for the actual root ("/")... It *should* already be at the top, but in roughly 25% of my test installs, it ends up on the bottom. Historically the order of mounts in `fstab` have not mattered, but for *some unknown reason*, in *this* build, it **has** mattered, every time! When issues arise, boot halts because the kernel claims it can't find lvm-root. Moving the mountpoint to the top, has resolved it every time.
 
 If you want to make changes to `fstab`, do it now:
 ```bash
@@ -789,10 +794,42 @@ NOTES:
 - The install.sh script we ran simply copies these files to the relevant locations for mkinitcpio.
 - I was very tempted to rip off kishorviswanathan and paste the scripts here directly... but proper attribution is in order!
 - kishorviswanathan is the GOAT!
+- also, be smart, and go read the scripts we're copying over:
+    - /tmp/arch-mkinitcpio-clevis-hook/hooks/clevis
+    - /tmp/arch-mkinitcpio-clevis-hook/install/clevis
 
 ---
 
-###  **Task 10: Edit mkinitcpio.conf**
+### **Task 10: Configure crypttab**
+
+Generate a random key:
+```bash
+dd if=/dev/urandom of=/etc/cryptsetup-keys.d/recovery.key bs=4096 count=1
+chmod 0400 /etc/cryptsetup-keys.d/recovery.key
+```
+Notes:
+- bs=4096 count=1 creates a 4KB random key (adjust if you want a larger key).
+- Permissions are restricted to root (0400) for security.
+
+Add the key to the recovery LUKS header:
+```bash
+cryptsetup luksAddKey /dev/sda2 /etc/cryptsetup-keys.d/recovery.key
+```
+
+- You will be prompted for the current LUKS password (from initial encryption).
+- This adds a new key slot using the keyfile.
+
+Now lets update crypttab to unlock the drive automatically:
+```bash
+UUID=$(cryptsetup luksUUID /dev/sda2)
+echo "cryptrec	UUID=$UUID	/etc/cryptsetup-keys.d/recovery.key luks" >> /etc/crypttab
+sudo ln -s /etc/cryptsetup-keys.d/recovery.key /etc/cryptsetup-keys.d/$UUID.key
+```
+NOTE: we will *only* do this for recovery. we NEVER want to store keys for the main OS in the open. Even if encrypted, the main drive can be scraped and keys aquired by maliscious individuals.
+
+---
+
+###  **Task 11: Edit mkinitcpio.conf**
 NOTE: there is a LOT going on here.
 - We are configuring zstd kernel compression
 - We are adding our primary hooks.
@@ -811,14 +848,14 @@ For KMS for AMD/Radeon GPUs, modify MODULES to include the following:
 ```text
 `MODULES=(amdgpu)`
 ```
-NOTE: DO NOT USE THIS IF YOU HAVE AN AMD/RADEON/NVIDIA GPU!
+NOTE: DO NOT USE THIS IF YOU HAVE AN INTEL/NVIDIA GPU!
 Won't hurt. Just won't work.
 
 For KMS for Intel Graphics, modify MODULES to include the following:
 ```bash
 `MODULES=(i915)`
 ```
-NOTE: DO NOT USE THIS IF YOU HAVE AN INTEL/NVIDIA GPU!
+NOTE: DO NOT USE THIS IF YOU HAVE AN AMD/RADEON/NVIDIA GPU!
 Won't hurt. Just won't work.
 
 For KMS for nvidia/nouveau GPUs...
@@ -860,10 +897,9 @@ done!
 Save and exit nano:
 > CTRL+X >> "y" >> [ENTER]
 
-
 ---
 
-###  **Task 11: Edit grub config**
+###  **Task 12: Edit grub config**
 ```bash
 nano /etc/default/grub
 ```
@@ -886,7 +922,7 @@ Save and exit nano:
 
 ---
 
-###  **Task 12: Install ucode for KMS**
+###  **Task 13: Install ucode for KMS**
 For AMD/Radeon graphics cards and iGPUs:
 ```bash
 pacman -S amd-ucode
@@ -920,41 +956,6 @@ grub-install --target=x86_64-efi --efi-directory=/boot/efi --bootloader-id=ARCHL
 grub-mkconfig -o /boot/grub/grub.cfg
 ```
 
-### **Task 14: Configure crypttab**
-
-Generate a random key:
-```bash
-dd if=/dev/urandom of=/etc/cryptsetup-keys.d/recovery.key bs=4096 count=1
-chmod 0400 /etc/cryptsetup-keys.d/recovery.key
-```
-Notes:
-- bs=4096 count=1 creates a 4KB random key (adjust if you want a larger key).
-- Permissions are restricted to root (0400) for security.
-
-Add the key to the recovery LUKS header:
-```bash
-cryptsetup luksAddKey /dev/sda2 /etc/cryptsetup-keys.d/recovery.key
-```
-
-- You will be prompted for the current LUKS password (from initial encryption).
-- This adds a new key slot using the keyfile.
-
-Now lets update crypttab to unlock the drive automatically:
-```bash
-UUID=$(cryptsetup luksUUID /dev/sda2)
-echo "cryptrec	UUID=$UUID	/etc/cryptsetup-keys.d/recovery.key luks" >> /etc/crypttab
-sudo ln -s /etc/cryptsetup-keys.d/recovery.key /etc/cryptsetup-keys.d/$UUID.key
-```
-NOTE: we will *only* do this for recovery. we NEVER want to store keys for the main OS in the open. Even if encrypted, the main drive can be scraped and keys aquired by maliscious individuals.
-
----
-
-At this point, you have a fully functional Arch install with full disk encryption.
-You *could* exit chroot, unmount the partitions, and continue on to the recovery build... But lets see how much more we can get done first!
-
----
-> # **IMPORTANT NOTE: DO NOT STOP HERE!!!**
-> If you opt to skip SECTION 5 and 6, you *absolutely* need to continue to section 7! The recovery build is NOT optional and clevis and the TPM seal is only half installed at this point!
 ---
 
 # SECTION 5: INSTALL ALL THE THINGS!!!
@@ -969,7 +970,7 @@ NOTE: I personally use Cinnamon and lightdm for my setup. As this is primarily a
 
 ###  Step 1: Install Cinnamon and LightDM
 ```bash
-pacman -S cinnamon lightdm lightdm-slick-greeter gnome-calculator gnome-terminal gedit vlc vlc-plugins-all celluloid cups system-config-printer networkmanager network-manager-applet blueman pavucontrol flameshot libreoffice-still hunspell-en_us hyphen-en evince code geany firefox chromium thunderbird transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted timeshift
+pacman -S cinnamon lightdm lightdm-slick-greeter gnome-calculator gnome-terminal gedit vlc vlc-plugins-all celluloid cups system-config-printer networkmanager network-manager-applet blueman pavucontrol flameshot libreoffice-still hunspell-en_us hyphen-en evince code geany firefox chromium thunderbird transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted
 ```
 NOTES: 
 - When pacman asks; use pipewire-jack (2) unless you intend to use pro audo tools... which I am not.
@@ -1053,7 +1054,7 @@ Yeah... I don't play a lot of games anymore. :/
 
 Install packages:
 ```bash
-pacman -S gnome gdm gnome-calculator gnome-terminal gedit vlc rhythmbox cups system-config-printer networkmanager network-manager-applet blueman pavucontrol flameshot libreoffice-fresh hunspell-en_us hyphen-en evince code firefox thunderbird chromium transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted timeshift
+pacman -S gnome gdm gnome-calculator gnome-terminal gedit vlc rhythmbox cups system-config-printer networkmanager network-manager-applet blueman pavucontrol flameshot libreoffice-fresh hunspell-en_us hyphen-en evince code firefox thunderbird chromium transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted
 ```
 
 Configure **automatic login** (Optional):
@@ -1078,7 +1079,7 @@ systemctl enable gdm cups NetworkManager
 
 Install packages:
 ```bash
-pacman -S plasma sddm konsole kcalc kate vlc elisa cups system-config-printer networkmanager plasma-nm bluedevil pavucontrol spectacle libreoffice-fresh hunspell-en_us hyphen-en okular firefox chromium thunderbird ktorrent gvfs gvfs-smb nfs-utils cifs-utils sshfs partitionmanager timeshift
+pacman -S plasma sddm konsole kcalc kate vlc elisa cups system-config-printer networkmanager plasma-nm bluedevil pavucontrol spectacle libreoffice-fresh hunspell-en_us hyphen-en okular firefox chromium thunderbird ktorrent gvfs gvfs-smb nfs-utils cifs-utils sshfs partitionmanager
 ```
 
 Configure **automatic login** (Optional):
@@ -1107,7 +1108,7 @@ systemctl enable sddm cups NetworkManager
 
 Install packages:
 ```bash
-pacman -S xfce4 xfce4-goodies lightdm lightdm-gtk-greeter galculator mousepad vlc parole cups system-config-printer networkmanager network-manager-applet blueman pavucontrol xfce4-screenshooter libreoffice-fresh hunspell-en_us hyphen-en evince firefox chromium thunderbird transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted timeshift
+pacman -S xfce4 xfce4-goodies lightdm lightdm-gtk-greeter galculator mousepad vlc parole cups system-config-printer networkmanager network-manager-applet blueman pavucontrol xfce4-screenshooter libreoffice-fresh hunspell-en_us hyphen-en evince firefox chromium thunderbird transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted
 ```
 
 Configure **automatic login** (Optional):
@@ -1138,7 +1139,7 @@ NOTE: I do not typically use this DE and WM. This section is basic, at best. Fee
 
 Install packages:
 ```bash
-pacman -S lxqt sddm gnome-calculator featherpad vlc celluloid cups system-config-printer networkmanager network-manager-applet blueman pavucontrol lximage-qt libreoffice-fresh hunspell-en_us hyphen-en okular firefox chromium thunderbird transmission-qt gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted timeshift
+pacman -S lxqt sddm gnome-calculator featherpad vlc celluloid cups system-config-printer networkmanager network-manager-applet blueman pavucontrol lximage-qt libreoffice-fresh hunspell-en_us hyphen-en okular firefox chromium thunderbird transmission-qt gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted
 ```
 
 Optional: Configure **automatic login** by editing:
@@ -1169,7 +1170,7 @@ Me, personally? I like the wall of text. Makes me feel like a hackerman! But tha
 
 ###  **Step 1: Install Plymouth**
 ```bash
-pacman -S plymouth
+pacman -S plymouth plymouth-themes
 ```
 
 ---
@@ -1228,7 +1229,142 @@ mkinitcpio -P linux
 
 ---
 
-# SECTION 7: RECOVERY
+# SECTION 7: SNAPPER AND GRUB-BTRFS
+
+Snapper manages Btrfs snapshots for easy rollbacks, while grub-btrfs integrates these snapshots into the GRUB boot menu for bootable recovery points. We'll set this up inside the chroot before exiting.
+
+⚠️ **Note:** In chroot, Snapper may fail due to D-Bus not being available (as systemd isn't fully running). Use the `--no-dbus` flag for configuration commands to bypass this. No need to start or stop D-Bus manually—this flag handles it.
+
+### Task 1: Install Snapper and grub-btrfs
+```bash
+pacman -S snapper grub-btrfs
+```
+
+---
+
+### Task 2: Configure Snapper for Root
+If `/.snapshots` exists (unlikely, but check):
+```bash
+umount /.snapshots
+rm -r /.snapshots
+```
+Create the config:
+```bash
+snapper --no-dbus -c root create-config /
+```
+This sets up snapshots for the `@` subvolume (your root).
+
+---
+
+### Task 3: Configure Snapper for Home (Optional, but Recommended)
+If `/home/.snapshots` exists:
+```bash
+umount /home/.snapshots
+rm -r /home/.snapshots
+```
+Create the config:
+```bash
+snapper --no-dbus -c home create-config /home
+```
+This sets up snapshots for the `@home` subvolume.
+
+---
+
+### Task 4: Adjust Snapper Permissions (Optional, for Non-Root Access)
+For root config:
+```bash
+chmod 750 /.snapshots
+chown :wheel /.snapshots
+```
+Repeat for home if configured:
+```bash
+chmod 750 /home/.snapshots
+chown :wheel /home/.snapshots
+```
+
+---
+
+### Task 5: Enable Snapper Timers
+These create hourly snapshots and clean up old ones:
+```bash
+systemctl enable snapper-timeline.timer
+systemctl enable snapper-cleanup.timer
+```
+
+---
+
+### Task 6: Create Initial Snapshot
+```bash
+snapper --no-dbus -c root create --description "Initial installation"
+```
+For home (if configured):
+```bash
+snapper --no-dbus -c home create --description "Initial installation"
+```
+
+---
+
+### Task 7: Configure grub-btrfs
+Enable the service to auto-update GRUB when snapshots change:
+```bash
+systemctl enable grub-btrfsd.service
+```
+Regenerate GRUB to include snapshots:
+```bash
+grub-mkconfig -o /boot/grub/grub.cfg
+```
+
+---
+
+### Task 8: Pacman Hook for Pre/Post Snapshots (Optional)
+For automatic snapshots on package changes, install `snap-pac` (AUR package). Since we're in chroot:
+```bash
+pacman -S base-devel  # If not installed
+su - archuser  # Switch to non-root user (reminder: use the user you suet up earlier)
+cd /tmp
+git clone https://aur.archlinux.org/snap-pac.git
+cd snap-pac
+makepkg -si
+```
+This adds hooks to create snapshots before/after `pacman` transactions.
+
+NOTE: I **really** hate installing from the AUR unless absolutly necessary, so you know this package is truely special!
+
+...and in that vein...
+
+If you recieve the error "ERROR: One or more PGP signatures could not be verified!" when running `makepkg -si`, you need to import the key:
+```bash
+gpg --recv-keys E4B5E45AA3B8C5C3  # replace the keyID with the unknown public key.
+```
+Then inspect the PKGBUILD in the cloned directory for the validpgpkeys array:
+```bash
+cat PKGBUILD | grep validpgpkeys
+```
+You should see something like this:
+```text
+validpgpkeys=('8535CEF3F3C38EE69555BF67E4B5E45AA3B8C5C3')
+```
+Then re-run 
+```bash
+makepkg -si
+```
+
+---
+
+> # **IMPORTANT NOTE: DO NOT STOP HERE!!!**
+At this point, you have a fully functional Arch install with full disk encryption and snapshots. You *could* exit chroot, unmount the partitions, and reboot into your new OS... But we're not done yet! You *absolutely* need to continue to section 8! The recovery build is NOT optional and clevis and the TPM seal is only half installed at this point! **DON'T YOU GIVE UP ON ME NOW!**
+---
+
+
+
+
+
+
+
+
+
+
+# SECTION 8: RECOVERY
 
 This section is where we will build the recovery partition. Full disclosure: recovery isn't strictly necessary, but in the even your have a boot failure and the SSD is still alive, you'll be glad you have it!
 
@@ -1283,7 +1419,7 @@ NOTES:
 
 ###  **Task 1: Install the base packages**
 ```
-pacstrap -i /mnt base linux linux-firmware nano grub efibootmgr
+pacstrap -i /mnt base linux linux-firmware nano nano-syntax-highlighting grub efibootmgr
 ```
 
 ---
@@ -1416,16 +1552,14 @@ WHEW! That was a lot, fast! hopefully you got it all!
 
 ---
 
-### **Task 14: Install Recovery Tools**
+### **Task 14: Install Additional Recovery Tools**
 ```bash
-pacman -S btrfs-progs lvm2 dosfstools ntfs-3g gdisk gptfdisk e2fsprogs rsync parted cryptsetup clevis luksmeta tpm2-tools networkmanager iwd openssh vim htop smartmontools timeshift grub efibootmgr pacman archinstall arch-install-scripts
-```
-⚠️ Note: Some of these tools may have been installed previously. This command ensures everything needed for recovery is present.
+pacman -S btrfs-progs dosfstools ntfs-3g gdisk gptfdisk e2fsprogs parted vim htop smartmontools archinstall arch-install-scripts testdisk wipe tmux fsarchiver stress partimage nano-syntax-highlighting
 
 Once installed, the recovery system can:
 - Inspect and repair partitions: LVM, Btrfs, ext2/3/4, FAT, NTFS
 - Recover encrypted volumes using Clevis/LUKS
-- Restore snapshots with Timeshift
+- Restore btrfs snapshots
 - Access the network via Ethernet or Wi-Fi
 - Reinstall GRUB or perform a full nuclear reinstall using pacstrap
 
@@ -1437,7 +1571,7 @@ Once installed, the recovery system can:
 
 > These steps are only needed in absolute worst-case scenarios — covering situations where the main OS is completely unbootable.
 
-# SECTION 8: BOOTLOADERS AND YOU!
+# SECTION 9: BOOTLOADERS AND YOU!
 
 ### **Task 1: Set the boot device in EFI firmware**
 
@@ -1525,11 +1659,11 @@ The recovery partition is NOT listed in the boot menu (which is why we disabled 
 | **Sony VAIO**           | `F11` or `Assist` button               | `F2`                  |
 ```
 
-Once in the boot device menu, you *should* see two familliar entries: ARCHLINUX and RECOVERY... these *should* be self explanitory, but RECOVERY will boot into your recovery partition. Doing this should be temporary, so on the next reboot your system will load into ARCHLINUX as we set previously with `efibootmgr`.
+Once in the boot device menu, you *should* see two familiar entries: ARCHLINUX and RECOVERY... these *should* be self explanitory, but RECOVERY will boot into your recovery partition. Doing this should be temporary, so on the next reboot your system will load into ARCHLINUX as we set previously with `efibootmgr`.
 
 ---
 
-# SECTION 9: BUTTON IT UP!
+# SECTION 10: BUTTON IT UP!
 
 This section configures a staged, user-mediated recovery update system. Recovery updates are applied only after at least one safe reboot of the main OS, and the user explicitly confirms applying the updates. Only packages that exist on the recovery partition are staged.
 
