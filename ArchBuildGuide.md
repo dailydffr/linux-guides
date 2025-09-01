@@ -1332,7 +1332,7 @@ NOTE: I **really** hate installing from the AUR unless absolutly necessary, so y
 
 ...and in that vein...
 
-If you recieve the error "ERROR: One or more PGP signatures could not be verified!" when running `makepkg -si`, you need to import the key:
+If you recieve the error "ERROR: One or more PGP signatures could not be verified!" when running `makepkg -si`, you need to import the public key:
 ```bash
 gpg --recv-keys E4B5E45AA3B8C5C3  # replace the keyID with the unknown public key.
 ```
@@ -1352,21 +1352,14 @@ makepkg -si
 ---
 
 > # **IMPORTANT NOTE: DO NOT STOP HERE!!!**
+
 At this point, you have a fully functional Arch install with full disk encryption and snapshots. You *could* exit chroot, unmount the partitions, and reboot into your new OS... But we're not done yet! You *absolutely* need to continue to section 8! The recovery build is NOT optional and clevis and the TPM seal is only half installed at this point! **DON'T YOU GIVE UP ON ME NOW!**
+
 ---
-
-
-
-
-
-
-
-
-
 
 # SECTION 8: RECOVERY
 
-This section is where we will build the recovery partition. Full disclosure: recovery isn't strictly necessary, but in the even your have a boot failure and the SSD is still alive, you'll be glad you have it!
+This section is where we will build the recovery partition. Full disclosure: recovery isn't strictly necessary, but in the event you have a boot failure and the SSD is still alive, you'll be glad you have it!
 
 ---
 
