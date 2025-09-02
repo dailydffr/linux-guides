@@ -101,8 +101,8 @@ sr0    11:0    1   1.3G  0 rom  /run/archiso/bootmnt
 
 Notes:  
 - In this example the target disk is `/dev/nvme0n1p` and it is a 256GB SSD.
-- NVMe drives use a different naming scheme (e.g., `/dev/nvme0n1`).  
-- This guide will use `/dev/nvme0n1p`. **replace with your actual device!**  
+- SATA drives use a different naming scheme (e.g., `/dev/sda1`).  
+- This guide will use the NVMe convention ie: `/dev/nvme0n1`. **replace with your actual device!**  
 - Copy/paste blindly at your own peril.
 
 ---
@@ -1879,4 +1879,5 @@ Summary:
 - After at least one safe reboot: user is prompted to apply updates.
 - Only packages installed on recovery are staged and updated.
 - Updates do not pile on automatically — the user is informed and must confirm.
+
 
