@@ -62,7 +62,7 @@ With expectations set, let’s begin the initial setup.
 
 # SECTION 1: SYSTEM CHECKS
 
-> ---
+---
 
 ###  **Task 1 - Verify boot mode**
 
@@ -84,7 +84,7 @@ These files are UEFI variables.
 If the directory is empty, or does not exist, stop here and reboot the installer in **UEFI mode**.
 
 
-> ---
+---
 
 ###  **Task 2: Identify available storage devices**
 We need to confirm what disk(s) are present before partitioning:
@@ -100,12 +100,12 @@ sr0    11:0    1   1.3G  0 rom  /run/archiso/bootmnt
 ```
 
 Notes:  
-- In this example the target disk is `/dev/sda` and it is a 256GB SSD.
+- In this example the target disk is `/dev/nvme0n1p` and it is a 256GB SSD.
 - NVMe drives use a different naming scheme (e.g., `/dev/nvme0n1`).  
-- This guide will use `/dev/sda`. **replace with your actual device!**  
+- This guide will use `/dev/nvme0n1p`. **replace with your actual device!**  
 - Copy/paste blindly at your own peril.
 
-> ---
+---
 
 ###  **Task 3: Detect network interfaces**
 
@@ -145,7 +145,7 @@ If you see interfaces such as:
 
 
 
-> ---
+---
 
 ###  **Task 4: Check the TPM**
 Let’s confirm you have a working **Trusted Platform Module (TPM):**
@@ -165,7 +165,7 @@ crw-rw---- 1 root tss  253, 65536 Aug 22 13:05 /dev/tpmrm0
 
 NOTE: If your system already has an active Ethernet connection (discovered in "SYSTEM CHECKS" → "Detect network interfaces"), you can skip the WiFi and DHCP/Manual IP tasks.
 
-> ---
+---
 
 ###  **Task 1: WiFi**
 If you do not have an active Ethernet link, use iwd to configure WiFi:
@@ -175,7 +175,7 @@ station list
 ```
 You will see something like this:
 ```text
-                            Devices in Station Mode                           *
+                             Devices in Station Mode                           *
 --------------------------------------------------------------------------------
   Name                  State            Scanning
 --------------------------------------------------------------------------------
@@ -207,10 +207,25 @@ One of those should be your router/ap. Otherwise, we're outside the scope of thi
 Connect to *your* network:
 ```bash
 station wlan0 connect YOUR-NETWORK-SSID
+```
+Check you're connected:
+```bash
+station list
+```
+`wlan0` should now appear "connected":
+```text
+                             Devices in Station Mode                           *
+--------------------------------------------------------------------------------
+  Name                  State            Scanning
+--------------------------------------------------------------------------------
+  wlan0                 connected
+```
+Exit `iwctl`:
+```bash
 exit
 ```
 
-> ---
+---
 
 ###  **Task 2: DHCP/Manual IP**
 Most networks use DHCP, which Arch ISO's NetworkManager handles automatically. 
@@ -226,7 +241,7 @@ Assumptions:
 - Default gateway at `192.168.1.1` (adjust for your network).  
 - Replace values with your network's configuration.
 
-> ---
+---
 
 ###  **Task 3: Check Internet Connection**
 Whether via Ethernet or WiFi, confirm Internet connectivity:
@@ -239,7 +254,7 @@ ping -c 3 8.8.8.8
 ```
 Successful replies indicate you have a working Internet connection.
 
-> ---
+---
 
 ###  **Task 4: Enable SSH access**
 Set a root password:
@@ -269,14 +284,14 @@ Why enable SSH? Copy/pasting commands from this guide remotely is much easier th
 NOTE: The astute will notice some strangeness in my partitioning... There is method to my madness.
 We will be building a recovery partition, standing right next to the EFI partition. This recovery partition is not just for emergencies — it’s a second, bootable Arch installation. However, for the sake of security it too will get the full encryption treatment.
 
-> ---
+---
 
 ###  **Task 1: Build the Partition Table**
 Launch the partitioning tool:
 ```bash
-cfdisk /dev/sda
+cfdisk /dev/nvme0n1p
 ```
-NOTE: remember to change `/dev/sda` to match your drive designation.
+NOTE: remember to change `/dev/nvme0n1p` to match your drive designation.
 
 Use "GPT" for partition type, then follow these steps:
 
@@ -289,8 +304,8 @@ Use "GPT" for partition type, then follow these steps:
 > [Write] -> type "yes" -> [Quit]
 
 NOTE: the second partition is the future recovery drive. I set it to 12GB. you can expand or shrink this if you like. 
-- For recovery, 6–8GB is enough for CLI-only.
-- 10–12GB if you want to add a light GUI.
+- For recovery, 6~8GB is enough for CLI-only.
+- 10~12GB if you want to add a light GUI.
 - Anything larger is just comfort room.
 
 Sanity check.
@@ -308,13 +323,13 @@ sda      8:0    0   256G  0 disk
 sr0     11:0    1   1.3G  0 rom  /run/archiso/bootmnt
 ```
 
-> ---
+---
 
 ###  **Task 2: Encrypt All the things!**
 Encrypt the non-EFI partitions:
 ```bash
-cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda2
-cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/sda3
+cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/nvme0n1p2
+cryptsetup luksFormat --type luks1 --cipher aes-xts-plain64 --key-size 512 --hash sha512 --iter-time 50 --sector-size 512 --use-random --verify-passphrase /dev/nvme0n1p3
 ```
 NOTES: All options in the commands above are chosen to ensure compatibility with GRUB, SSDs, and strong encryption. Note: GRUB does not support LUKS2 yet, hence `--type luks1`, and it's very picky about iter-time and sector-size. Unless you know what you’re doing, just leave the command as-is.
 
@@ -326,8 +341,8 @@ What qualifies as a strong password?
   
 Now, Open the newly encrypted partitions:
 ```bash
-cryptsetup luksOpen /dev/sda2 cryptrec
-cryptsetup luksOpen /dev/sda3 cryptsys
+cryptsetup luksOpen /dev/nvme0n1p2 cryptrec
+cryptsetup luksOpen /dev/nvme0n1p3 cryptsys
 ```
 And once again, let's check your work!
 ```bash
@@ -346,7 +361,7 @@ sda            8:0    0   256G  0 disk
 sr0           11:0    1   1.3G  0 rom   /run/archiso/bootmnt
 ```
 
-> ---
+---
 
 ###  **Task 3: Swap Calculation**
 How much swap do you need?
@@ -368,7 +383,7 @@ If you *do* have 64 GB or more of RAM… congratulations! You probably don’t e
 Either way, make sure you take note of the number, you'll need it in a moment.
 
 
-> ---
+---
 
 ###  **Task 4: Setup LVMs**
 We’re now going to carve up cryptsys into logical volumes for root and swap.
@@ -414,12 +429,12 @@ sda              8:0    0   256G  0 disk
 sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt
 ```
 
-> ---
+---
 
 ###  **Task 5: Format Partitions**
 Format EFI (Fat32):
 ```bash
-mkfs.fat -F32 /dev/sda1
+mkfs.fat -F32 /dev/nvme0n1p1
 ```
 Format recovery (ext4):
 ```bash
@@ -434,7 +449,7 @@ Format lvm-swap (swap):
 mkswap /dev/mapper/lvm-swap
 ```
 
-> ---
+---
 
 ###  **Task 6: Setup btrfs on root**
 Temporarily mount lvm-root to create subvols:
@@ -469,7 +484,7 @@ umount /mnt
 ```
 > ⚠️ THIS IS NECESSARY! Do not skip! ⚠️
 
-> ---
+---
 
 ###  **Task 7: Prepare the build space**
 Mount @ (compressed):
@@ -482,7 +497,7 @@ mkdir -p /mnt/{boot/efi,home,var/log,var/cache,var/lib/pacman,var/tmp,recovery}
 ```
 Mount efi (secure, minimal writes):
 ```bash
-mount -o umask=0077 /dev/sda1 /mnt/boot/efi
+mount -o umask=0077 /dev/nvme0n1p1 /mnt/boot/efi
 ```
 Mount @home (compressed):
 ```bash
@@ -584,7 +599,7 @@ sed -i 's/^#Server/Server/' /etc/pacman.d/mirrorlist
 ```
 Force refresh the keyring (important if switching to Arch):
 ```bash
-sudo pacman -Sy archlinux-keyring
+pacman -Sy archlinux-keyring
 ```
 Rank mirrors for speed (optional):
 ```bash
@@ -618,11 +633,11 @@ genfstab -U /mnt >> /mnt/etc/fstab
 
 Get UUID of the luks container and add it to the bottom of the grub config file (**THIS MUST BE DONE OUTSIDE CHROOT**):
 ```bash
-cryptsetup luksUUID /dev/sda3 >> /mnt/etc/default/grub
+cryptsetup luksUUID /dev/nvme0n1p3 >> /mnt/etc/default/grub
 ```
 NOTE: We capture the luksUUID here to simplify editing GRUB later inside the chroot. It will be used for GRUB_CMDLINE_LINUX’s cryptdevice parameter. Aquiring this UUID later may add complications. It's best to do it now, when theres no doubt the UUID is correct.
 
-Reminder: `/dev/sda3` is the main system (cryptsys). We do NOT need to do this for /dev/sda2 **yet**. We’ll capture `/dev/sda2` (recovery) later, when we set up GRUB for recovery.
+Reminder: `/dev/nvme0n1p3` is the main system (cryptsys). We do NOT need to do this for /dev/nvme0n1p2 **yet**. We’ll capture `/dev/nvme0n1p2` (recovery) later, when we set up GRUB for recovery.
 
 Check system config files:
 ```bash
@@ -643,7 +658,7 @@ The output of `cat /mnt/etc/fstab` will look similar to this:
 # /dev/mapper/lvm-root LABEL=root
 UUID=4a40d049-b74f-4034-915a-a500f5404030	/         	btrfs     	rw,noatime,compress=zstd:3,ssd,discard=async,space_cache=v2,subvol=/@	0 0
 
-# /dev/sda1
+# /dev/nvme0n1p1
 UUID=73DC-6BAC      	/boot/efi 	vfat      	rw,relatime,fmask=0077,dmask=0077,codepage=437,iocharset=ascii,shortname=mixed,utf8,errors=remount-ro	0 2
 
 # /dev/mapper/lvm-root LABEL=root
@@ -698,7 +713,7 @@ pacman -Syy
 ```
 Install packages:
 ```bash
-pacman -S reflector git rsync clevis luksmeta tpm2-tools lvm2 cryptsetup iwd networkmanager openssh sudo
+pacman -S reflector git rsync clevis luksmeta tpm2-tools lvm2 dialog networkmanager iw iwd wireless_tools dhcpcd wpa_supplicant openssh
 ```
 
 ---
@@ -707,6 +722,7 @@ pacman -S reflector git rsync clevis luksmeta tpm2-tools lvm2 cryptsetup iwd net
 ```bash
 systemctl enable sshd.service
 systemctl enable NetworkManager.service
+systemctl enable bluetooth.service
 ```
 
 ---
@@ -748,8 +764,8 @@ NOTE: I'm in the US so I used "en_US.UTF-8". See [this wiki page](https://wiki.a
 ###  **Task 7: Set the computer name**
 ```bash
 echo archlinux > /etc/hostname
-echo 127.0.0.1	archlinux >> /etc/hosts
-echo 127.0.1.1	archlinux.local.net	archlinux >> /etc/hosts
+echo 127.0.0.1    archlinux.local.net  archlinux >> /etc/hosts
+echo 127.0.1.1    archlinux.local.net  archlinux >> /etc/hosts
 ```
 NOTES:
 - Obviously replace "archlinux" with your preferred computer name.
@@ -777,10 +793,28 @@ passwd archuser
 ```
 NOTE: Change "archuser" to your preferred username.
 
-
 ---
 
-###  **Task 9: Setup clevis**
+###  **Task 9: Configure NetworkManager to use iwd**
+
+IWD supports WPA3 better than wpa_supplicant so lets make use of it!
+
+Configure NetworkManager:
+```bash
+nano /etc/NetworkManager/NetworkManager.conf
+```
+Add the following:
+```text
+[device]
+wifi.backend=iwd
+```
+
+Save and exit nano:
+> CTRL+X >> "y" >> [ENTER]
+
+
+
+###  **Task 10: Setup clevis**
 Clone the mkinitcpio-clevis-hook from git:
 ```bash
 cd /tmp
@@ -800,7 +834,7 @@ NOTES:
 
 ---
 
-### **Task 10: Configure crypttab**
+### **Task 11: Configure crypttab**
 
 Generate a random key:
 ```bash
@@ -813,7 +847,7 @@ Notes:
 
 Add the key to the recovery LUKS header:
 ```bash
-cryptsetup luksAddKey /dev/sda2 /etc/cryptsetup-keys.d/recovery.key
+cryptsetup luksAddKey /dev/nvme0n1p2 /etc/cryptsetup-keys.d/recovery.key
 ```
 
 - You will be prompted for the current LUKS password (from initial encryption).
@@ -821,15 +855,15 @@ cryptsetup luksAddKey /dev/sda2 /etc/cryptsetup-keys.d/recovery.key
 
 Now lets update crypttab to unlock the drive automatically:
 ```bash
-UUID=$(cryptsetup luksUUID /dev/sda2)
+UUID=$(cryptsetup luksUUID /dev/nvme0n1p2)
 echo "cryptrec	UUID=$UUID	/etc/cryptsetup-keys.d/recovery.key luks" >> /etc/crypttab
-sudo ln -s /etc/cryptsetup-keys.d/recovery.key /etc/cryptsetup-keys.d/$UUID.key
+ln -s /etc/cryptsetup-keys.d/recovery.key /etc/cryptsetup-keys.d/$UUID.key
 ```
 NOTE: we will *only* do this for recovery. we NEVER want to store keys for the main OS in the open. Even if encrypted, the main drive can be scraped and keys aquired by maliscious individuals.
 
 ---
 
-###  **Task 11: Edit mkinitcpio.conf**
+###  **Task 12: Edit mkinitcpio.conf**
 NOTE: there is a LOT going on here.
 - We are configuring zstd kernel compression
 - We are adding our primary hooks.
@@ -899,13 +933,13 @@ Save and exit nano:
 
 ---
 
-###  **Task 12: Edit grub config**
+###  **Task 13: Edit grub config**
 ```bash
 nano /etc/default/grub
 ```
 Modify GRUB_CMDLINE_LINUX to inform clevis which device to decrypt at boot: 
 ```text
-GRUB_CMDLINE_LINUX="cryptdevice=UUID=<luksUUID-of-/dev/sda3>:cryptsys resume=/dev/mapper/lvm-swap"
+GRUB_CMDLINE_LINUX="cryptdevice=UUID=<luksUUID-of-/dev/nvme0n1p3>:cryptsys resume=/dev/mapper/lvm-swap"
 ```
 Uncomment/Add the following:
 ```text
@@ -913,7 +947,7 @@ GRUB_ENABLE_CRYPTODISK=y
 ```
 NOTES:
 - The UUID should be at the bottom of the file. 
-- The UUID was added to the file earlier using `cryptsetup luksUUID /dev/sda3 >> /mnt/etc/default/grub`
+- The UUID was added to the file earlier using `cryptsetup luksUUID /dev/nvme0n1p3 >> /mnt/etc/default/grub`
 - If you use the "CTRL+K" method, you'll need to remove the carraige return it likes to add after the UUID pastes in.
 - If you *don't* use CTRL+K, and type/paste it in manually, make sure you delete the UUID from the bottom of the file. Leaving it will cause errors!
 
@@ -922,7 +956,7 @@ Save and exit nano:
 
 ---
 
-###  **Task 13: Install ucode for KMS**
+###  **Task 14: Install ucode for KMS**
 For AMD/Radeon graphics cards and iGPUs:
 ```bash
 pacman -S amd-ucode
@@ -937,7 +971,7 @@ NOTES:
 
 ---
 
-###  **Task 13: Build/Install initramfs and grub**
+###  **Task 15: Build/Install initramfs and grub**
 
 NOTES:
 - It **should not** be necessary to build the kernel image if you installed a ucode package. A hook triggers mkinitcpio during package installation, so the initramfs should already be generated.
@@ -970,7 +1004,16 @@ NOTE: I personally use Cinnamon and lightdm for my setup. As this is primarily a
 
 ###  Step 1: Install Cinnamon and LightDM
 ```bash
-pacman -S cinnamon lightdm lightdm-slick-greeter gnome-calculator gnome-terminal gedit vlc vlc-plugins-all celluloid cups system-config-printer networkmanager network-manager-applet blueman pavucontrol flameshot libreoffice-still hunspell-en_us hyphen-en evince code geany firefox chromium thunderbird transmission-gtk gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted
+pacman -S cinnamon lightdm lightdm-slick-greeter \
+  gnome-calculator gnome-terminal gedit \
+  vlc vlc-plugins-all celluloid \
+  cups system-config-printer \
+  network-manager-applet blueman \
+  pavucontrol flameshot \
+  libreoffice-still hunspell-en_us hyphen-en evince code geany \
+  firefox chromium thunderbird transmission-gtk \
+  gvfs gvfs-smb nfs-utils cifs-utils sshfs gparted \
+  keepassxc veracrypt
 ```
 NOTES: 
 - When pacman asks; use pipewire-jack (2) unless you intend to use pro audo tools... which I am not.
@@ -1004,19 +1047,19 @@ Save and exit:
 Enable services:
 ```bash
 systemctl enable cups.service
-systemctl enable NetworkManager.service
 systemctl enable lightdm.service
 ```
 
 Enable Flameshot autostart:
 ```bash
+su archuser      # change to your preferred username!
 mkdir -p ~/.config/autostart
 cp /usr/share/applications/org.flameshot.Flameshot.desktop ~/.config/autostart/
-nano ~/.config/autostart/org.flameshot.Flameshot.desktop
 ```
-Modify this:
-```text
-Exec=flameshot --background
+
+return to root prompt:
+```bash
+exit
 ```
 
 ---
@@ -1026,11 +1069,11 @@ Fun and games!
 Install Vulkan support:
 - For AMD graphics:
 ```bash
-pacman -S vulkan-intel
+pacman -S amdvlk vulkan-radeon
 ```
 - For Intel graphics:
 ```bash
-pacman -S amdvlk vulkan-radeon
+pacman -S vulkan-intel
 ```
 - For nvidia graphics (proprietary):
 ```bash
@@ -1164,13 +1207,11 @@ systemctl enable cups sddm NetworkManager
 
 Plymouth provides a graphical splash screen during boot and shutdown. It smooths out the startup experience and hides the initial wall of text, while still letting you switch to verbose output if needed (`Esc` key). It is entirely optional and will have no effect on the rest of this build guide. In other words, this is strictly cosmetic and thus optional!
 
-Me, personally? I like the wall of text. Makes me feel like a hackerman! But that's just me.
-
 ---
 
 ###  **Step 1: Install Plymouth**
 ```bash
-pacman -S plymouth plymouth-themes
+pacman -S plymouth
 ```
 
 ---
@@ -1332,7 +1373,7 @@ NOTE: I **really** hate installing from the AUR unless absolutly necessary, so y
 
 ...and in that vein...
 
-If you recieve the error "ERROR: One or more PGP signatures could not be verified!" when running `makepkg -si`, you need to import the public key:
+If you recieve the error "ERROR: One or more PGP signatures could not be verified!" when running `makepkg -si`, you need to import the key:
 ```bash
 gpg --recv-keys E4B5E45AA3B8C5C3  # replace the keyID with the unknown public key.
 ```
@@ -1348,18 +1389,20 @@ Then re-run
 ```bash
 makepkg -si
 ```
+Return to root shell:
+```bash
+exit
+```
 
 ---
 
 > # **IMPORTANT NOTE: DO NOT STOP HERE!!!**
-
 At this point, you have a fully functional Arch install with full disk encryption and snapshots. You *could* exit chroot, unmount the partitions, and reboot into your new OS... But we're not done yet! You *absolutely* need to continue to section 8! The recovery build is NOT optional and clevis and the TPM seal is only half installed at this point! **DON'T YOU GIVE UP ON ME NOW!**
-
 ---
 
 # SECTION 8: RECOVERY
 
-This section is where we will build the recovery partition. Full disclosure: recovery isn't strictly necessary, but in the event you have a boot failure and the SSD is still alive, you'll be glad you have it!
+This section is where we will build the recovery partition. Full disclosure: recovery isn't strictly necessary, but in the even your have a boot failure and the SSD is still alive, you'll be glad you have it!
 
 ---
 
@@ -1381,7 +1424,7 @@ mkdir -p /mnt/boot/efi
 ```
 Mount efi (secure, minimal writes):
 ```bash
-mount -o umask=0077 /dev/sda1 /mnt/boot/efi
+mount -o umask=0077 /dev/nvme0n1p1 /mnt/boot/efi
 ```
 Sanity check:
 ```bash
@@ -1402,25 +1445,44 @@ sda              8:0    0   256G  0 disk
 sr0             11:0    1   1.3G  0 rom   /run/archiso/bootmnt
 ```
 
+Create a minimal 512MB swap file
+```bash
+fallocate -l 512M /mnt/swapfile
+chmod 600 /mnt/swapfile
+mkswap /mnt/swapfile
+swapon /mnt/swapfile
+```
+
+Sanity checks:
+```bash
+lsblk
+```
+and...
+```bash
+swapon --show
+free -h
+```
+
 ---
 
 NOTES:
-- We need to effectively repeat everything we did in Section 4. There are subtle differences so I'm not going to do the lazy "just go back and repeat". That said, it's a very tedious process so I'm going to just blitz through it.
+- Now we essentially need to repeat everything we did in Section 4. There are subtle differences so I'm not going to do the lazy "just go back and repeat". That said, it's a very tedious process so I'm just going to blitz through it.
 - We will **NOT** be repeating SECTION 5 or 6. Though we will be installing some additional recovery tools.
 
 ---
 
 ###  **Task 1: Install the base packages**
 ```
-pacstrap -i /mnt base linux linux-firmware nano nano-syntax-highlighting grub efibootmgr
+pacstrap -i /mnt base linux linux-firmware nano nano-syntax-highlighting grub efibootmgr sudo
 ```
+> Reminder: install `iptables-nft` when prompted.
 
 ---
 
 ###   **Task 2: Run pre-chroot configuration**
 ```
 genfstab -U /mnt >> /mnt/etc/fstab
-cryptsetup luksUUID /dev/sda2 >> /mnt/etc/default/grub
+cryptsetup luksUUID /dev/nvme0n1p2 >> /mnt/etc/default/grub
 ```
 
 ---
@@ -1433,15 +1495,15 @@ arch-chroot /mnt /bin/bash
 ---
 
 ###   **Task 4: Install needed tools**
-```
-pacman -Syy && pacman -S reflector git rsync clevis luksmeta tpm2-tools lvm2 cryptsetup iwd networkmanager openssh sudo
+```bash
+pacman -Syy reflector git rsync clevis luksmeta tpm2-tools lvm2 dialog networkmanager iw iwd wireless_tools dhcpcd wpa_supplicant openssh
 ```
 
 ---
 
 ###   **Task 5: Enable Services**
 ```
-systemctl enable sshd NetworkManager
+systemctl enable sshd NetworkManager bluetooth
 ```
 
 ---
@@ -1517,10 +1579,10 @@ nano /etc/default/grub
 ```
 - Set GRUB_CMDLINE_LINUX:  
 ```
-GRUB_CMDLINE_LINUX="cryptdevice=UUID=<luksUUID-of-/dev/sda2>:cryptrec"
+GRUB_CMDLINE_LINUX="cryptdevice=UUID=<luksUUID-of-/dev/nvme0n1p2>:cryptrec"
 ```
 - Set `GRUB_ENABLE_CRYPTODISK=y`
-> REMINDER: the UUID of /dev/sda2 will be at the bottom of the file. CTRL+K to cut. CTRL+U to paste.
+> REMINDER: the UUID of /dev/nvme0n1p2 will be at the bottom of the file. CTRL+K to cut. CTRL+U to paste.
 
 ---
 
@@ -1603,37 +1665,27 @@ efibootmgr -b 0003 -B
 
 Make these changes now before moving on, or ensure you are at peace with the current setup.
 
-### **Task 2: Configure LUKS/TPM2 bind with Clevis**
+---
 
-Bind the root partition to TPM2:
-```bash
-clevis luks bind -d /dev/sda3 tpm2 '{"pcr_bank":"sha256","pcr_ids":"0,4,7"}'
-```
-It will ask to initialize the drive. This is expected. Hit "y" > ENTER
-
-Notes:
-- pcr_bank specifies the hash algorithm; sha256 is recommended.
-- pcr_ids correspond to firmware and boot measurements:
-  - PCR 0: Changes if system firmware (BIOS/UEFI) is updated.
-  - PCR 4: Changes if bootloader or kernel is modified (including updates).
-  - PCR 7: Captures “boot policy” measurements, including:
-    - Default EFI boot entry selection
-    - EFI Boot Manager variables (BootOrder, BootNext, etc.)
-    - Secure Boot state and policy keys (KEK/PK/DB/DBX) if enabled
-    - Certain firmware-specific boot path settings
-  - PCR 7 usually remains stable, which is why we ensured the boot manager was correctly set before running this command.
-
-### **Task 3: Unmount and reboot**
+### **Task 15: leave chroot and unmount**
 ```bash
 exit
+swapoff /mnt/swapfile
 umount -R /mnt
-swapoff /dev/mapper/lvm-swap
+```
+
+---
+
+# SECTION 10: BUTTON IT UP!
+
+### Task 1: Confirm recovery boot options are available
+
+Simply reboot out of the archiso environment:
+```bash
 reboot
 ```
 
-Your Arch system is now fully installed, encrypted, and ready to boot. The recovery partition is also configured for emergency use.
-
-The recovery partition is NOT listed in the boot menu (which is why we disabled it). To load into the recovery partition, during boot, use your PCs boot functions to get into the UEFI boot device menu. This differes from manufacturer to manufacturer, but heres a table with the common methods:
+When you boot, you may notice right away the recovery partition is NOT listed in the grub boot menu (after entering your luks password). To load into the recovery partition, you must use your PCs boot functions to get into the UEFI boot device menu. This differes from manufacturer to manufacturer, but heres a table with the common methods:
 
 ```text
 | Vendor (desktop/laptop) | Boot menu key                          | Setup (UEFI/BIOS) key |
@@ -1652,11 +1704,46 @@ The recovery partition is NOT listed in the boot menu (which is why we disabled 
 | **Sony VAIO**           | `F11` or `Assist` button               | `F2`                  |
 ```
 
-Once in the boot device menu, you *should* see two familiar entries: ARCHLINUX and RECOVERY... these *should* be self explanitory, but RECOVERY will boot into your recovery partition. Doing this should be temporary, so on the next reboot your system will load into ARCHLINUX as we set previously with `efibootmgr`.
+Once in the boot device menu, you will see two familiar entries: `ARCHLINUX` and `RECOVERY`... these *should* be self explanitory; `RECOVERY` will boot into your recovery partition. Doing this should be temporary, so on the next reboot your system will load into `ARCHLINUX` as we set previously with `efibootmgr`. The benefit of this setup is it adds to the obscurity of your recovery options for your typical evil maid attack. It's there, but not obvious.
+
+Simply confirm you can see both `ARCHLINUX` and `RECOVERY` in your firmware's boot device menu.
+
+### **Task 2: Configure LUKS/TPM2 bind with Clevis**
+
+When you finally boot into your new archlinux install, you will notice it asks you for your luks password twice. Once when grub needs to open it to get to the initramfs, and once when the kernel asks for it to fully open the luks partition. This is something I warned you about and this is the behavior you should ALWAYS watch out for! In **this case**, it's merely because we haven't bound the luks partition to the tpm! I tried to make it work from within the chroot, but there were just too many hoops for my ADHD so Lets do it from within the freshly booted OS!
+
+Bind the root partition to TPM2:
+
+Simply open a terminal emulator, or switch to the console (CTRL+ALT+F{2-6}).
+Then run this command:
+```bash
+clevis luks bind -d /dev/nvme0n1p3 tpm2 '{"pcr_bank":"sha256","pcr_ids":"0,4,7"}'
+```
+It will ask to initialize the drive. This is expected. Hit "y" > ENTER
+
+Notes:
+- pcr_bank specifies the hash algorithm; sha256 is recommended.
+- pcr_ids correspond to firmware and boot measurements:
+  - PCR 0: Changes if system firmware (BIOS/UEFI) is updated.
+  - PCR 4: Changes if bootloader or kernel is modified (including updates).
+  - PCR 7: Captures “boot policy” measurements, including:
+    - Default EFI boot entry selection
+    - EFI Boot Manager variables (BootOrder, BootNext, etc.)
+    - Secure Boot state and policy keys (KEK/PK/DB/DBX) if enabled
+    - Certain firmware-specific boot path settings
+  - PCR 7 usually remains stable, which is why we ensured the boot manager was correctly set before running this command.
 
 ---
 
-# SECTION 10: BUTTON IT UP!
+And that's it! Your Arch system is now installed, encrypted, and ready to go safely out into the wild.
+
+---
+
+# WORKS IN PROGRESS!!!
+
+Continue here at your own perill... I'm working on some hooks to allow you to update your recovery partition without haveing to chroot into it for update/upgrades. It'll be nice to have and not have to think about unless you absolutly need it.
+
+# SECTION 11: RECOVERY UPDATES
 
 This section configures a staged, user-mediated recovery update system. Recovery updates are applied only after at least one safe reboot of the main OS, and the user explicitly confirms applying the updates. Only packages that exist on the recovery partition are staged.
 
